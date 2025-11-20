@@ -178,6 +178,7 @@ body {
     font-weight: bold;
     letter-spacing: 5px;
     text-transform: uppercase;
+    transition: font-size 0.3s ease;
 }
 
 .link-desc {
@@ -191,4 +192,40 @@ body {
 #main-nav a:hover .link-name {
     color: #00ffff;
     text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+/* =========================================
+   Mobile Responsiveness
+   ========================================= */
+@media (max-width: 768px) {
+    #menu-toggle {
+        width: 60px; /* Larger touch target */
+        height: 60px;
+        top: 15px;
+        left: 15px;
+        font-size: 30px;
+    }
+
+    #main-nav ul {
+        width: 90%;
+    }
+
+    .link-name {
+        font-size: 1.5rem; /* Smaller font for mobile */
+        letter-spacing: 2px;
+    }
+
+    .link-desc {
+        font-size: 0.8rem;
+    }
+
+    #main-nav li {
+        margin: 15px 0;
+    }
+
+    /* Ensure Back button in Archive is also responsive */
+    #back-to-nexus {
+        padding: 8px 15px;
+        font-size: 12px;
+    }
 }

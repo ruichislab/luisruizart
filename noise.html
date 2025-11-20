@@ -111,10 +111,21 @@
         const mesh = new THREE.Mesh(geometry, material);
         scene.add(mesh);
 
+        function updateMouse(x, y) {
+            uniforms.u_mouse.value.x = x;
+            uniforms.u_mouse.value.y = y;
+        }
+
         document.addEventListener('mousemove', (e) => {
-            uniforms.u_mouse.value.x = e.clientX;
-            uniforms.u_mouse.value.y = e.clientY;
+            updateMouse(e.clientX, e.clientY);
         });
+
+        document.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if(e.touches.length > 0) {
+                updateMouse(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: false });
 
         window.addEventListener('resize', () => {
             renderer.setSize(window.innerWidth, window.innerHeight);

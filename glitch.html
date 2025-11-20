@@ -11,7 +11,7 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            font-size: 5rem;
+            font-size: 10vw; /* Responsive font size */
             font-weight: bold;
             text-transform: uppercase;
             white-space: nowrap;
@@ -75,13 +75,16 @@
 
         const texts = ["ERROR", "NULL POINTER", "VOID", "404", "CORRUPTION", "WAKE UP", "DATA LOSS"];
 
-        document.addEventListener('click', () => {
+        function triggerGlitch() {
             const t = texts[Math.floor(Math.random() * texts.length)];
             baseText.innerText = t;
             l1.innerText = t;
             l2.innerText = t;
             corruptScreen();
-        });
+        }
+
+        document.addEventListener('click', triggerGlitch);
+        document.addEventListener('touchstart', triggerGlitch);
 
         // Canvas Corruption
         const canvas = document.getElementById('corrupt-canvas');

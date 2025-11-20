@@ -178,14 +178,29 @@ class World {
     addEventListeners() {
         window.addEventListener('resize', this.onWindowResize.bind(this));
         document.addEventListener('mousemove', this.onMouseMove.bind(this));
+        document.addEventListener('touchmove', this.onTouchMove.bind(this), { passive: false });
 
         const startPrompt = document.getElementById('start-prompt');
-        startPrompt.addEventListener('click', () => {
-            this.startExperience();
-        });
+        startPrompt.addEventListener('click', () => this.startExperience());
+        startPrompt.addEventListener('touchstart', () => this.startExperience());
 
         // Raycaster click
         document.addEventListener('click', this.onClick.bind(this));
+        document.addEventListener('touchstart', this.onClick.bind(this));
+    }
+
+    onTouchMove(event) {
+        if (event.touches.length > 0) {
+            event.preventDefault(); // Prevent scrolling
+            const touch = event.touches[0];
+            // Normalize touch coordinates similar to mouse
+            this.targetMouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+            this.targetMouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+            if (this.started) {
+                this.audioEngine.modulate(this.targetMouse.x, this.targetMouse.y);
+            }
+        }
     }
 
     startExperience() {
