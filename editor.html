@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOLODECK EDITOR | Net Art Tool</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        body {
+            background: #111;
+            color: #00ffff;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #editor-container {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        canvas {
+            background: #000;
+            cursor: crosshair;
+            display: block;
+        }
+
+        #toolbar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 10, 20, 0.9);
+            padding: 15px;
+            border: 1px solid #00ffff;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .tool-section {
+            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+        }
+
+        .tool-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            color: #00ffff;
+            padding: 8px;
+            cursor: pointer;
+            font-family: inherit;
+            text-transform: uppercase;
+            font-size: 12px;
+            transition: all 0.2s;
+            width: 100%;
+            text-align: left;
+        }
+
+        button:hover, button.active {
+            background: rgba(0, 255, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #00ffff;
+        }
+
+        input[type="color"] {
+            width: 100%;
+            background: transparent;
+            border: none;
+            height: 30px;
+        }
+
+        #drop-zone {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            text-align: center;
+            opacity: 0.5;
+            transition: opacity 0.3s;
+        }
+
+        .hidden { opacity: 0 !important; }
+    </style>
+</head>
+<body>
+
+    <div id="editor-container">
+        <canvas id="canvas"></canvas>
+        <div id="drop-zone">
+            <h1>DROP IMAGE HERE</h1>
+            <p>or draw from scratch</p>
+        </div>
+    </div>
+
+    <div id="toolbar">
+        <div class="tool-section">
+            <span class="tool-label">TOOLS</span>
+            <button id="btn-brush" class="active">Brush</button>
+            <button id="btn-eraser">Eraser</button>
+            <button id="btn-generative">Net-Brush</button>
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">SETTINGS</span>
+            <input type="color" id="color-picker" value="#00ffff">
+            <span class="tool-label">Size</span>
+            <input type="range" id="size-picker" min="1" max="100" value="5">
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">FILTERS</span>
+            <button id="btn-invert">Invert Colors</button>
+            <button id="btn-grayscale">Grayscale</button>
+            <button id="btn-glitch">Cyber Glitch</button>
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">SYSTEM</span>
+            <button id="btn-clear">Clear Void</button>
+            <button id="btn-save">Download Artifact</button>
+        </div>
+    </div>
+
+    <script type="module" src="js/menu.js"></script>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const dropZone = document.getElementById('drop-zone');
+
+        // Set Canvas Size
+        canvas.width = Math.min(800, window.innerWidth - 40);
+        canvas.height = Math.min(600, window.innerHeight - 40);
+
+        // Fill black initially
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // State
+        let painting = false;
+        let tool = 'brush'; // brush, eraser, generative
+        let color = '#00ffff';
+        let size = 5;
+
+        // Elements
+        const sizePicker = document.getElementById('size-picker');
+        const colorPicker = document.getElementById('color-picker');
+        const btns = document.querySelectorAll('button');
+
+        // Event Listeners for Tools
+        document.getElementById('btn-brush').onclick = () => setTool('brush', document.getElementById('btn-brush'));
+        document.getElementById('btn-eraser').onclick = () => setTool('eraser', document.getElementById('btn-eraser'));
+        document.getElementById('btn-generative').onclick = () => setTool('generative', document.getElementById('btn-generative'));
+
+        sizePicker.oninput = (e) => size = e.target.value;
+        colorPicker.oninput = (e) => color = e.target.value;
+
+        document.getElementById('btn-clear').onclick = () => {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            dropZone.classList.remove('hidden');
+        };
+
+        document.getElementById('btn-save').onclick = () => {
+            const link = document.createElement('a');
+            link.download = 'holodeck-artifact.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        };
+
+        // Filters
+        document.getElementById('btn-invert').onclick = () => applyFilter('invert');
+        document.getElementById('btn-grayscale').onclick = () => applyFilter('grayscale');
+        document.getElementById('btn-glitch').onclick = () => applyFilter('glitch');
+
+        function setTool(name, btnElement) {
+            tool = name;
+            btns.forEach(b => b.classList.remove('active'));
+            if(btnElement) btnElement.classList.add('active');
+        }
+
+        // Drawing Logic
+        function startPosition(e) {
+            painting = true;
+            draw(e);
+            dropZone.classList.add('hidden');
+        }
+
+        function endPosition() {
+            painting = false;
+            ctx.beginPath();
+        }
+
+        function draw(e) {
+            if (!painting) return;
+
+            // Get mouse pos relative to canvas
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            ctx.lineWidth = size;
+            ctx.lineCap = 'round';
+
+            if (tool === 'eraser') {
+                ctx.strokeStyle = '#000000';
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            } else if (tool === 'brush') {
+                ctx.strokeStyle = color;
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+            } else if (tool === 'generative') {
+                // Net Art Brush: Draws connecting nodes/lines
+                ctx.fillStyle = color;
+                ctx.fillRect(x + (Math.random()-0.5)*20, y + (Math.random()-0.5)*20, Math.random()*size, Math.random()*size);
+
+                if(Math.random() > 0.5) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 1;
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + (Math.random()-0.5)*50, y + (Math.random()-0.5)*50);
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Mouse Events
+        canvas.addEventListener('mousedown', startPosition);
+        canvas.addEventListener('mouseup', endPosition);
+        canvas.addEventListener('mousemove', draw);
+
+        // Touch Events
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startPosition(e); });
+        canvas.addEventListener('touchend', (e) => { e.preventDefault(); endPosition(); });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
+
+        // Drag & Drop Image
+        document.body.addEventListener('dragover', (e) => e.preventDefault());
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('hidden');
+
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.match('image.*')) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        // Draw image fitting canvas
+                        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+                        const w = img.width * scale;
+                        const h = img.height * scale;
+                        const x = (canvas.width - w) / 2;
+                        const y = (canvas.height - h) / 2;
+
+                        ctx.drawImage(img, x, y, w, h);
+                    };
+                    img.src = ev.target.result;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Filter Implementations
+        function applyFilter(type) {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                if (type === 'invert') {
+                    data[i] = 255 - data[i];     // r
+                    data[i + 1] = 255 - data[i + 1]; // g
+                    data[i + 2] = 255 - data[i + 2]; // b
+                } else if (type === 'grayscale') {
+                    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    data[i] = avg;
+                    data[i + 1] = avg;
+                    data[i + 2] = avg;
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+
+            if (type === 'glitch') {
+                // Pixel displacement
+                for(let i=0; i<20; i++) {
+                    const y = Math.random() * canvas.height;
+                    const h = Math.random() * 50;
+                    const offset = (Math.random() - 0.5) * 50;
+
+                    const slice = ctx.getImageData(0, y, canvas.width, h);
+                    ctx.putImageData(slice, offset, y);
+                }
+            }
+        }
+    </script>
+</body>
+</html>

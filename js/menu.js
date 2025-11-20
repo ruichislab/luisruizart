@@ -24,7 +24,8 @@ export class NavigationMenu {
             { name: 'A R C H I V E', url: 'archive.html', desc: 'Legacy Collection (20 Rooms)' },
             { name: 'DIGITAL RAIN', url: 'rain.html', desc: 'Falling Code' },
             { name: 'NOISE FIELD', url: 'noise.html', desc: 'Fluid Dynamics' },
-            { name: 'CYBER GLITCH', url: 'glitch.html', desc: 'Data Corruption' }
+            { name: 'CYBER GLITCH', url: 'glitch.html', desc: 'Data Corruption' },
+            { name: 'HOLODECK EDITOR', url: 'editor.html', desc: 'Web Photoshop / Tool' }
         ];
 
         const ul = document.createElement('ul');
