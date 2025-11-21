@@ -215,7 +215,10 @@ class LayerManager {
             delBtn.innerHTML = '🗑️';
             delBtn.onclick = (e) => { e.stopPropagation(); this.deleteLayer(i); };
 
-            el.onclick = () => this.setActiveLayer(i);
+            // On Click Handler
+            // Use explicit function to avoid closure issues? No, let i is fine.
+            // But ensure we capture it correctly.
+            el.addEventListener('click', () => this.setActiveLayer(i));
 
             el.appendChild(visBtn);
             el.appendChild(nameSpan);

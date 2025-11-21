@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AETHER LAB | Creation Engine</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
@@ -30,7 +30,7 @@
                 #080808 10px,
                 #080808 20px
             );
-            overflow: auto; /* scroll if canvas is huge */
+            overflow: hidden; /* Handle pan/zoom internally */
         }
 
         #canvas-wrapper {
@@ -38,8 +38,9 @@
             box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
             border: 1px solid rgba(0, 255, 255, 0.2);
             background: #000; /* Base background */
-            overflow: hidden;
             cursor: crosshair;
+            touch-action: none; /* Important for gestures */
+            transform-origin: top left;
         }
 
         /* Checkboard pattern for transparency */
@@ -69,6 +70,7 @@
             z-index: 100;
             overflow-y: auto;
             box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+            transition: transform 0.3s ease;
         }
 
         .panel-title {
@@ -238,6 +240,7 @@
             flex-direction: column;
             backdrop-filter: blur(20px);
             z-index: 200;
+            transition: transform 0.3s ease;
         }
 
         #timeline-controls {
@@ -312,9 +315,102 @@
             color: #000;
         }
 
+        /* Mobile Responsive */
+        #mobile-toggle {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 300;
+            background: #000;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            padding: 10px;
+            width: auto;
+            font-size: 18px;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+        }
+
+        #mobile-hand {
+            display: none;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 300;
+            background: #000;
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            padding: 10px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 24px;
+        }
+
+        #mobile-hand.active {
+            background: #00ffff;
+            color: #000;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+            }
+
+            #toolbar {
+                position: fixed;
+                top: 0;
+                right: 0;
+                height: 100vh;
+                transform: translateX(100%);
+                width: 85%;
+                max-width: 320px;
+                padding-top: 70px; /* space for toggle */
+            }
+
+            #toolbar.open {
+                transform: translateX(0);
+            }
+
+            #timeline-panel {
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                height: 100px;
+            }
+
+            #timeline-controls {
+                overflow-x: auto;
+                gap: 5px;
+                padding: 0 10px;
+            }
+
+            #mobile-toggle {
+                display: block;
+            }
+
+            #mobile-hand {
+                display: block;
+            }
+
+            #editor-container {
+                height: calc(100vh - 100px); /* Minus timeline */
+            }
+
+            .t-btn {
+                padding: 5px 8px;
+                font-size: 12px;
+            }
+        }
+
     </style>
 </head>
 <body>
+
+    <button id="mobile-toggle">☰</button>
+    <button id="mobile-hand">✋</button>
 
     <div id="editor-container">
         <div id="canvas-viewport" style="position:relative; overflow:hidden; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
@@ -335,11 +431,9 @@
             <button class="t-btn" id="btn-dup-frame">Duplicate</button>
             <button class="t-btn" id="btn-del-frame">Delete</button>
 
-            <div style="display:flex; align-items:center; margin-left:auto; gap:10px">
-                <span style="font-size:11px; color:#aaa">Onion Skin:</span>
-                <input type="checkbox" id="onion-skin-toggle">
-                <span style="font-size:11px; color:#aaa">FPS:</span>
-                <input type="number" id="fps-input" value="12" min="1" max="60" style="width:50px; margin:0;">
+            <div style="display:flex; align-items:center; margin-left:auto; gap:5px">
+                <span style="font-size:10px; color:#aaa">FPS:</span>
+                <input type="number" id="fps-input" value="12" min="1" max="60" style="width:40px; margin:0;">
             </div>
         </div>
         <div id="frames-container">

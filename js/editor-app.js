@@ -102,18 +102,8 @@ class EditorApp {
         };
 
         // --- Magic Wand UI ---
-        // We need a button for Magic Wand tool activation?
-        // Or just "Remove BG" action.
-        // Let's make "Magic Wand" a tool mode.
-        // And "Remove BG" a quick action.
-
-        // Inject Magic Wand Button into DOM if not exists (plan didn't modify html for tool buttons yet)
-        // But wait, we can just use existing structure.
-        // I will assume I need to add a button dynamically or reuse.
-        // Let's add a "Magic Wand" button to the Tools section dynamically for now.
-
         const toolSection = document.querySelector('.tool-section:nth-child(3) .row');
-        if (toolSection) {
+        if (toolSection && !document.getElementById('btn-wand')) {
             const btn = document.createElement('button');
             btn.id = 'btn-wand';
             btn.innerText = 'Wand';
@@ -121,13 +111,30 @@ class EditorApp {
             toolSection.appendChild(btn);
         }
 
-        // Add "Remove All BG" button to post-process
         const postSection = document.querySelector('.tool-section:nth-child(5)');
-        if(postSection) {
+        if(postSection && !document.getElementById('btn-rem-bg')) {
              const btn = document.createElement('button');
+             btn.id = 'btn-rem-bg';
              btn.innerText = 'Remove BG (Auto)';
              btn.onclick = () => this.magicWand.removeBackground();
              postSection.appendChild(btn);
+        }
+
+        // Mobile Controls
+        const mobToggle = document.getElementById('mobile-toggle');
+        if(mobToggle) {
+            mobToggle.onclick = () => {
+                document.getElementById('toolbar').classList.toggle('open');
+            };
+        }
+
+        const mobHand = document.getElementById('mobile-hand');
+        if(mobHand) {
+            mobHand.onclick = () => {
+                this.isPanning = !this.isPanning;
+                mobHand.classList.toggle('active');
+                this.wrapper.style.cursor = this.isPanning ? 'grab' : 'crosshair';
+            };
         }
     }
 
@@ -161,7 +168,7 @@ class EditorApp {
         // Draw Events
         this.wrapper.addEventListener('mousedown', (e) => {
             if (this.isPanning || (e.buttons === 4) || (e.buttons === 1 && e.ctrlKey)) { // Middle click or space+click
-                 this.isPanning = true;
+                 this.isPanning = true; // Force pan mode
                  this.lastPanX = e.clientX;
                  this.lastPanY = e.clientY;
                  return;
@@ -170,22 +177,82 @@ class EditorApp {
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (this.isPanning && e.buttons) {
-                 const dx = e.clientX - this.lastPanX;
-                 const dy = e.clientY - this.lastPanY;
-                 this.panX += dx;
-                 this.panY += dy;
-                 this.lastPanX = e.clientX;
-                 this.lastPanY = e.clientY;
-                 this.updateTransform();
-                 return;
+            if (this.isPanning && (e.buttons || e.type === 'touchmove')) { // check buttons or if panning mode locked
+                 // If locked via Hand tool, we always pan if mouse down
+                 if (e.buttons) {
+                     const dx = e.clientX - this.lastPanX;
+                     const dy = e.clientY - this.lastPanY;
+                     this.panX += dx;
+                     this.panY += dy;
+                     this.lastPanX = e.clientX;
+                     this.lastPanY = e.clientY;
+                     this.updateTransform();
+                     return;
+                 }
             }
             this.draw(e);
         });
 
         window.addEventListener('mouseup', () => {
             this.endPosition();
-            this.isPanning = false;
+            // Do not auto-reset panning if it was toggled via button
+            if (!document.getElementById('mobile-hand').classList.contains('active')) {
+                 if(this.isPanning) this.isPanning = false;
+            }
+        });
+
+        // Touch Events for Pinch Zoom
+        this.wrapper.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault(); // Stop browser zoom
+                this.isPinching = true;
+                this.lastPinchDist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+            } else if (e.touches.length === 1) {
+                if(this.isPanning) {
+                     this.lastPanX = e.touches[0].clientX;
+                     this.lastPanY = e.touches[0].clientY;
+                } else {
+                    this.startPosition(e);
+                }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2 && this.isPinching) {
+                e.preventDefault();
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY
+                );
+                const delta = dist - this.lastPinchDist;
+                this.zoom += delta * 0.01;
+                this.zoom = Math.max(0.1, Math.min(5, this.zoom));
+                this.lastPinchDist = dist;
+                this.updateTransform();
+            } else if (e.touches.length === 1) {
+                 if (this.isPanning) {
+                     e.preventDefault();
+                     const dx = e.touches[0].clientX - this.lastPanX;
+                     const dy = e.touches[0].clientY - this.lastPanY;
+                     this.panX += dx;
+                     this.panY += dy;
+                     this.lastPanX = e.touches[0].clientX;
+                     this.lastPanY = e.touches[0].clientY;
+                     this.updateTransform();
+                 } else {
+                     // prevent scroll while drawing
+                     e.preventDefault();
+                     this.draw(e);
+                 }
+            }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+            if (e.touches.length < 2) this.isPinching = false;
+            this.endPosition();
         });
     }
 
