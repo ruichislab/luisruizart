@@ -42,8 +42,10 @@ class EditorApp {
     init() {
         this.bindUI();
         this.bindEvents();
-        this.projectManager.renderUI = this.renderTimeline.bind(this); // Re-bind
-        this.renderTimeline(); // Initial render
+        // Re-bind UI callback just in case
+        this.projectManager.uiCallback = this.renderTimeline.bind(this);
+        // Force render now that projectManager is fully assigned
+        this.renderTimeline();
         this.animate();
     }
 
@@ -94,12 +96,23 @@ class EditorApp {
         document.getElementById('btn-dup-frame').onclick = () => this.projectManager.addFrame(true);
         document.getElementById('btn-del-frame').onclick = () => this.projectManager.deleteFrame();
 
-        document.getElementById('onion-skin-toggle').onchange = (e) => {
-            this.projectManager.onionSkin = e.target.checked;
-        };
-        document.getElementById('fps-input').onchange = (e) => {
-            this.projectManager.fps = parseInt(e.target.value);
-        };
+        const onionToggle = document.getElementById('onion-skin-toggle');
+        if (onionToggle) {
+            onionToggle.onchange = (e) => {
+                this.projectManager.onionSkin = e.target.checked;
+            };
+        } else {
+            console.error("onion-skin-toggle not found");
+        }
+
+        const fpsInput = document.getElementById('fps-input');
+        if (fpsInput) {
+            fpsInput.onchange = (e) => {
+                this.projectManager.fps = parseInt(e.target.value);
+            };
+        } else {
+            console.error("fps-input not found");
+        }
 
         // --- Magic Wand UI ---
         const toolSection = document.querySelector('.tool-section:nth-child(3) .row');

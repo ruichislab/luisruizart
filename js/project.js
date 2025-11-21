@@ -6,7 +6,7 @@ class ProjectManager {
         this.uiCallback = uiCallback; // To update Timeline UI
 
         this.frames = []; // Array of Frame objects
-        this.currentFrameIndex = 0;
+        this.currentFrameIndex = -1;
         this.fps = 12;
         this.isPlaying = false;
         this.animationId = null;
@@ -71,7 +71,9 @@ class ProjectManager {
         this.frames.splice(this.currentFrameIndex + 1, 0, newFrame);
         this.currentFrameIndex++;
         this.loadFrame(this.currentFrameIndex);
-        this.uiCallback();
+        if (this.uiCallback) {
+            this.uiCallback();
+        }
     }
 
     deleteFrame() {
@@ -86,14 +88,20 @@ class ProjectManager {
 
     // Save current canvas state into the current frame object
     saveCurrentFrame() {
-        if (!this.frames[this.currentFrameIndex]) return;
+        if (!this.frames || !this.frames[this.currentFrameIndex]) {
+            console.warn("saveCurrentFrame: Frame not found");
+            return;
+        }
 
         const frame = this.frames[this.currentFrameIndex];
-        // We need to sync LayerManager layers to Frame layers
-        // Assuming LayerManager layers align with Frame layers by index
+
+        if (!this.layerManager || !this.layerManager.layers) {
+            console.error("saveCurrentFrame: LayerManager or layers missing");
+            return;
+        }
 
         this.layerManager.layers.forEach((l, i) => {
-            if (frame.layers[i]) {
+            if (frame.layers && frame.layers[i]) {
                 frame.layers[i].data = l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height);
                 frame.layers[i].visible = l.visible;
                 frame.layers[i].opacity = l.opacity;
