@@ -1,17 +1,32 @@
 import { LayerManager } from './layers.js';
+import { ProjectManager } from './project.js';
+import { MagicWand } from './tools/magic-wand.js';
+import { PaletteManager } from './palette.js';
 
 class EditorApp {
     constructor() {
         this.wrapper = document.getElementById('canvas-wrapper');
-        this.layerManager = new LayerManager(this.wrapper);
+        this.viewport = document.getElementById('canvas-viewport');
 
-        // Default Size
+        // Core Systems
+        this.layerManager = new LayerManager(this.wrapper);
+        this.projectManager = new ProjectManager(this.layerManager, this.renderTimeline.bind(this));
+        this.magicWand = new MagicWand(this.layerManager);
+        this.paletteManager = new PaletteManager('palette-container', (c) => {
+            this.color = c;
+            document.getElementById('color-picker').value = c;
+        });
+
+        // Setup Canvas
         this.width = 800;
         this.height = 600;
         this.layerManager.setSize(this.width, this.height);
 
-        // Initial Layer
-        this.layerManager.addLayer('Background');
+        // Zoom/Pan State
+        this.zoom = 1;
+        this.panX = 0;
+        this.panY = 0;
+        this.isPanning = false;
 
         // State
         this.painting = false;
@@ -21,112 +36,197 @@ class EditorApp {
         this.lastX = 0;
         this.lastY = 0;
 
-        // Tool Settings
-        this.tools = {
-            brush: { name: 'Brush' },
-            eraser: { name: 'Eraser' },
-            netweaver: { name: 'Net-Weaver' },
-            cyberflow: { name: 'Cyber-Flow' },
-            glitch: { name: 'Glitch-Drag' },
-            fractal: { name: 'Fractal-Dust' }
-        };
+        this.init();
+    }
 
+    init() {
         this.bindUI();
         this.bindEvents();
-
-        // Initialize Animation Loop for generative brushes
+        this.projectManager.renderUI = this.renderTimeline.bind(this); // Re-bind
+        this.renderTimeline(); // Initial render
         this.animate();
     }
 
     bindUI() {
-        // Size Inputs
-        const wInput = document.getElementById('canvas-width');
-        const hInput = document.getElementById('canvas-height');
-        const resizeBtn = document.getElementById('btn-resize');
-
-        if(wInput && hInput && resizeBtn) {
-            wInput.value = this.width;
-            hInput.value = this.height;
-            resizeBtn.onclick = () => {
-                this.width = parseInt(wInput.value);
-                this.height = parseInt(hInput.value);
-                this.layerManager.setSize(this.width, this.height);
-                this.centerCanvas();
-            };
-        }
+        // --- Existing UI ---
+        document.getElementById('btn-resize').onclick = () => {
+            const w = parseInt(document.getElementById('canvas-width').value);
+            const h = parseInt(document.getElementById('canvas-height').value);
+            this.width = w;
+            this.height = h;
+            this.layerManager.setSize(w, h);
+            this.updateTransform();
+        };
 
         // Tools
-        Object.keys(this.tools).forEach(key => {
-            const btn = document.getElementById(`btn-${key}`);
-            if (btn) {
-                btn.onclick = () => this.setTool(key, btn);
-            }
+        const tools = ['brush', 'eraser', 'netweaver', 'cyberflow', 'glitch', 'fractal'];
+        tools.forEach(t => {
+            const btn = document.getElementById(`btn-${t}`);
+            if(btn) btn.onclick = () => this.setTool(t, btn);
         });
 
-        // Properties
         document.getElementById('size-picker').oninput = (e) => this.size = parseInt(e.target.value);
         document.getElementById('color-picker').oninput = (e) => this.color = e.target.value;
 
-        // Layer Controls
-        document.getElementById('btn-add-layer').onclick = () => this.layerManager.addLayer();
-
-        const btnClear = document.getElementById('btn-clear-layer');
-        if(btnClear) btnClear.onclick = () => this.layerManager.clearActiveLayer();
-
-        const btnUndo = document.getElementById('btn-undo');
-        if(btnUndo) btnUndo.onclick = () => this.layerManager.undo();
-
-        // Keyboard Shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'z') {
-                e.preventDefault();
-                this.layerManager.undo();
-            }
-        });
+        document.getElementById('btn-add-layer').onclick = () => {
+             this.layerManager.addLayer();
+             this.projectManager.handleLayerAdd(); // Sync frames
+        };
+        document.getElementById('btn-clear-layer').onclick = () => this.layerManager.clearActiveLayer();
+        document.getElementById('btn-undo').onclick = () => this.layerManager.undo();
 
         // Filters
-        document.getElementById('btn-invert').onclick = () => this.applyFilter('invert');
-        document.getElementById('btn-grayscale').onclick = () => this.applyFilter('grayscale');
-        document.getElementById('btn-rgb-split').onclick = () => this.applyFilter('rgb-split');
-        document.getElementById('btn-pixelate').onclick = () => this.applyFilter('pixelate');
+        const filters = ['invert', 'grayscale', 'rgb-split', 'pixelate'];
+        filters.forEach(f => {
+            document.getElementById(`btn-${f}`).onclick = () => this.applyFilter(f);
+        });
 
         // Export
-        document.getElementById('btn-save').onclick = () => this.exportImage();
+        document.getElementById('btn-save').onclick = () => this.exportSpritesheet();
+
+        // --- Timeline UI ---
+        document.getElementById('btn-play').onclick = () => {
+            this.projectManager.play();
+            document.getElementById('btn-play').classList.toggle('active');
+            document.getElementById('btn-play').innerText = this.projectManager.isPlaying ? '❚❚' : '▶';
+        };
+        document.getElementById('btn-add-frame').onclick = () => this.projectManager.addFrame(false);
+        document.getElementById('btn-dup-frame').onclick = () => this.projectManager.addFrame(true);
+        document.getElementById('btn-del-frame').onclick = () => this.projectManager.deleteFrame();
+
+        document.getElementById('onion-skin-toggle').onchange = (e) => {
+            this.projectManager.onionSkin = e.target.checked;
+        };
+        document.getElementById('fps-input').onchange = (e) => {
+            this.projectManager.fps = parseInt(e.target.value);
+        };
+
+        // --- Magic Wand UI ---
+        // We need a button for Magic Wand tool activation?
+        // Or just "Remove BG" action.
+        // Let's make "Magic Wand" a tool mode.
+        // And "Remove BG" a quick action.
+
+        // Inject Magic Wand Button into DOM if not exists (plan didn't modify html for tool buttons yet)
+        // But wait, we can just use existing structure.
+        // I will assume I need to add a button dynamically or reuse.
+        // Let's add a "Magic Wand" button to the Tools section dynamically for now.
+
+        const toolSection = document.querySelector('.tool-section:nth-child(3) .row');
+        if (toolSection) {
+            const btn = document.createElement('button');
+            btn.id = 'btn-wand';
+            btn.innerText = 'Wand';
+            btn.onclick = () => this.setTool('wand', btn);
+            toolSection.appendChild(btn);
+        }
+
+        // Add "Remove All BG" button to post-process
+        const postSection = document.querySelector('.tool-section:nth-child(5)');
+        if(postSection) {
+             const btn = document.createElement('button');
+             btn.innerText = 'Remove BG (Auto)';
+             btn.onclick = () => this.magicWand.removeBackground();
+             postSection.appendChild(btn);
+        }
     }
 
     bindEvents() {
-        // Mouse/Touch on Wrapper
-        this.wrapper.addEventListener('mousedown', this.startPosition.bind(this));
-        this.wrapper.addEventListener('touchstart', (e) => { e.preventDefault(); this.startPosition(e); });
+        // Pan/Zoom
+        this.viewport.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? 0.9 : 1.1;
+                this.zoom *= delta;
+                this.updateTransform();
+            } else {
+                // Scroll panning?
+            }
+        });
 
-        window.addEventListener('mouseup', this.endPosition.bind(this));
-        window.addEventListener('touchend', this.endPosition.bind(this));
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                this.wrapper.style.cursor = 'grab';
+                this.isPanning = true;
+            }
+        });
 
-        window.addEventListener('mousemove', this.draw.bind(this));
-        window.addEventListener('touchmove', (e) => { e.preventDefault(); this.draw(e); });
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                this.wrapper.style.cursor = 'crosshair';
+                this.isPanning = false;
+            }
+        });
+
+        // Draw Events
+        this.wrapper.addEventListener('mousedown', (e) => {
+            if (this.isPanning || (e.buttons === 4) || (e.buttons === 1 && e.ctrlKey)) { // Middle click or space+click
+                 this.isPanning = true;
+                 this.lastPanX = e.clientX;
+                 this.lastPanY = e.clientY;
+                 return;
+            }
+            this.startPosition(e);
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (this.isPanning && e.buttons) {
+                 const dx = e.clientX - this.lastPanX;
+                 const dy = e.clientY - this.lastPanY;
+                 this.panX += dx;
+                 this.panY += dy;
+                 this.lastPanX = e.clientX;
+                 this.lastPanY = e.clientY;
+                 this.updateTransform();
+                 return;
+            }
+            this.draw(e);
+        });
+
+        window.addEventListener('mouseup', () => {
+            this.endPosition();
+            this.isPanning = false;
+        });
     }
 
-    setTool(name, btn) {
-        this.tool = name;
-        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-        if (btn) btn.classList.add('active');
+    updateTransform() {
+        this.wrapper.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.zoom})`;
     }
 
     getPos(e) {
         const rect = this.wrapper.getBoundingClientRect();
+        const scaleX = this.width / rect.width;
+        const scaleY = this.height / rect.height;
+
         const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
         const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+
         return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
+            x: (clientX - rect.left) * scaleX,
+            y: (clientY - rect.top) * scaleY
         };
     }
 
-    startPosition(e) {
-        this.painting = true;
-        this.netWeaverPoints = []; // Reset for new stroke
+    setTool(name, btn) {
+        this.tool = name;
+        document.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        if(btn) btn.classList.add('active');
+    }
 
-        // Save state for undo
+    startPosition(e) {
+        if(this.tool === 'wand') {
+             const pos = this.getPos(e);
+             this.magicWand.floodFillClear(Math.floor(pos.x), Math.floor(pos.y));
+             return;
+        }
+
+        this.painting = true;
+        this.netWeaverPoints = [];
+
+        // Logic for Onion skin rendering? No, canvas handles it.
+        // Save state before stroke? handled by layer manager?
+        // Wait, ProjectManager handles frames. LayerManager handles UNDO for current canvas.
+        // Undo should work on current frame layers.
         this.layerManager.saveState();
 
         const pos = this.getPos(e);
@@ -134,15 +234,19 @@ class EditorApp {
         this.lastY = pos.y;
         this.draw(e);
 
-        // Hide drop hint
         const dropZone = document.getElementById('drop-zone');
         if(dropZone) dropZone.classList.add('hidden');
     }
 
     endPosition() {
-        this.painting = false;
-        const layer = this.layerManager.getActiveLayer();
-        if (layer) layer.ctx.beginPath();
+        if (this.painting) {
+            this.painting = false;
+            const layer = this.layerManager.getActiveLayer();
+            if (layer) layer.ctx.beginPath();
+
+            // Save to frame data immediately after stroke
+            this.projectManager.saveCurrentFrame();
+        }
     }
 
     draw(e) {
@@ -160,7 +264,6 @@ class EditorApp {
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
 
-        // Brush Implementation
         if (this.tool === 'brush') {
             ctx.strokeStyle = this.color;
             ctx.globalCompositeOperation = 'source-over';
@@ -174,7 +277,7 @@ class EditorApp {
             ctx.moveTo(this.lastX, this.lastY);
             ctx.lineTo(x, y);
             ctx.stroke();
-            ctx.globalCompositeOperation = 'source-over'; // reset
+            ctx.globalCompositeOperation = 'source-over';
         } else if (this.tool === 'netweaver') {
             this.drawNetWeaver(ctx, x, y);
         } else if (this.tool === 'cyberflow') {
@@ -189,31 +292,22 @@ class EditorApp {
         this.lastY = y;
     }
 
-    // --- Generative Tools ---
-
+    // --- Brushes Copied from Previous ---
     drawNetWeaver(ctx, x, y) {
         ctx.strokeStyle = this.color;
         ctx.fillStyle = this.color;
         ctx.globalCompositeOperation = 'source-over';
-
-        // 1. Draw node
         ctx.beginPath();
         ctx.arc(x, y, Math.random() * this.size/2, 0, Math.PI*2);
         ctx.fill();
-
-        // 2. Connect to random nearby points in history (simulated by looking at canvas?)
-        // Looking at canvas pixels is slow. Let's keep a local "recent points" buffer for this stroke.
         if (!this.netWeaverPoints) this.netWeaverPoints = [];
-
         this.netWeaverPoints.push({x, y});
         if (this.netWeaverPoints.length > 50) this.netWeaverPoints.shift();
-
         ctx.lineWidth = 1;
         this.netWeaverPoints.forEach(p => {
             const dx = p.x - x;
             const dy = p.y - y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-
             if (dist < 100 && Math.random() > 0.8) {
                 ctx.beginPath();
                 ctx.moveTo(x, y);
@@ -224,73 +318,50 @@ class EditorApp {
     }
 
     drawCyberFlow(ctx, x, y) {
-        // Fluid-like trails
         ctx.strokeStyle = this.color;
-        ctx.globalCompositeOperation = 'screen'; // Glowy look
-
+        ctx.globalCompositeOperation = 'screen';
         const particles = 5;
         for(let i=0; i<particles; i++) {
             const offset = (Math.random() - 0.5) * this.size * 2;
             const angle = Math.random() * Math.PI * 2;
-
             const px = x + Math.cos(angle) * offset;
             const py = y + Math.sin(angle) * offset;
-
             ctx.lineWidth = Math.random() * 2;
             ctx.beginPath();
             ctx.moveTo(this.lastX, this.lastY);
-
-            // Bezier curve towards mouse
             const cp1x = this.lastX + (Math.random()-0.5)*50;
             const cp1y = this.lastY + (Math.random()-0.5)*50;
-
             ctx.quadraticCurveTo(cp1x, cp1y, px, py);
             ctx.stroke();
         }
     }
 
     drawGlitchDrag(ctx, x, y) {
-        // Smudge / Displacement
         const w = this.size * 4;
         const h = this.size * 4;
-
-        // Copy a chunk from nearby and paste it here
         const sx = x + (Math.random()-0.5) * 50;
         const sy = y + (Math.random()-0.5) * 50;
-
         try {
-            // This operation is heavy if done every move, might need throttling
             const data = ctx.getImageData(sx, sy, w, h);
-
-            // Manipulate pixels? Maybe RGB shift
             const d = data.data;
             for(let i=0; i<d.length; i+=4) {
-                if (i % 20 === 0) {
-                    d[i] = 255; // Add red noise
-                }
+                if (i % 20 === 0) d[i] = 255;
             }
-
             ctx.putImageData(data, x - w/2, y - h/2);
-        } catch(e) {
-            // Off canvas read might fail
-        }
+        } catch(e) {}
     }
 
     drawFractalDust(ctx, x, y) {
         ctx.fillStyle = this.color;
         ctx.globalCompositeOperation = 'lighter';
-
         const recursiveDraw = (bx, by, size, depth) => {
             if (depth <= 0) return;
-
             ctx.fillRect(bx, by, size, size);
-
             if (Math.random() > 0.5) {
                 const offset = size * 2;
                 recursiveDraw(bx + (Math.random()-0.5)*offset, by + (Math.random()-0.5)*offset, size*0.6, depth-1);
             }
         };
-
         recursiveDraw(x, y, this.size, 3);
     }
 
@@ -300,7 +371,6 @@ class EditorApp {
         const ctx = layer.ctx;
         const w = layer.canvas.width;
         const h = layer.canvas.height;
-
         const imgData = ctx.getImageData(0, 0, w, h);
         const data = imgData.data;
 
@@ -320,53 +390,148 @@ class EditorApp {
             }
             ctx.putImageData(imgData, 0, 0);
         } else if (name === 'rgb-split') {
-            // Need a copy of source
             const source = new Uint8ClampedArray(data);
-            const offset = 10; // Pixel offset
-
+            const offset = 10;
             for(let i=0; i<data.length; i+=4) {
-                // Red channel: shift left
                 const rIdx = i - offset * 4;
                 if (rIdx >= 0) data[i] = source[rIdx];
-
-                // Blue channel: shift right
                 const bIdx = i + offset * 4;
                 if (bIdx < data.length) data[i+2] = source[bIdx+2];
-
-                // Green stays
             }
             ctx.putImageData(imgData, 0, 0);
         } else if (name === 'pixelate') {
             const size = 10;
-            // Create temporary canvas to downscale then upscale
             const temp = document.createElement('canvas');
             temp.width = w / size;
             temp.height = h / size;
             const tctx = temp.getContext('2d');
-
             tctx.drawImage(layer.canvas, 0, 0, temp.width, temp.height);
-
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(temp, 0, 0, w, h);
             ctx.imageSmoothingEnabled = true;
         }
+
+        this.projectManager.saveCurrentFrame();
     }
 
-    exportImage() {
-        const comp = this.layerManager.getCompositeCanvas();
+    // --- Timeline Rendering ---
+    renderTimeline() {
+        const container = document.getElementById('frames-container');
+        if (!container) return; // Guard against missing element
+        container.innerHTML = '';
+
+        // Only render if frames exist and projectManager is ready
+        if (!this.projectManager || !this.projectManager.frames) return;
+
+        this.projectManager.frames.forEach((frame, index) => {
+            const thumb = document.createElement('div');
+            thumb.className = `frame-thumb ${index === this.projectManager.currentFrameIndex ? 'active' : ''}`;
+            thumb.onclick = () => this.projectManager.loadFrame(index);
+
+            const num = document.createElement('span');
+            num.className = 'frame-number';
+            num.innerText = index + 1;
+
+            // Preview
+            // Draw simplified preview to a tiny canvas
+            const preview = document.createElement('canvas');
+            preview.width = 50;
+            preview.height = 50;
+            const pCtx = preview.getContext('2d');
+
+            // Scale down
+            // We just take the first visible layer? Or composite.
+            // Let's take composite of top visible.
+            const topL = frame.layers.slice().reverse().find(l => l.visible);
+            if (topL && topL.data) {
+                // Need helper to draw ImageData
+                const hC = document.createElement('canvas');
+                hC.width = this.width;
+                hC.height = this.height;
+                hC.getContext('2d').putImageData(topL.data, 0, 0);
+
+                pCtx.drawImage(hC, 0, 0, 50, 50);
+            } else {
+                 pCtx.fillStyle = '#222';
+                 pCtx.fillRect(0, 0, 50, 50);
+            }
+
+            thumb.appendChild(preview);
+            thumb.appendChild(num);
+            container.appendChild(thumb);
+        });
+    }
+
+    // --- Export ---
+    exportSpritesheet() {
+        const frames = this.projectManager.frames;
+        const fWidth = this.width;
+        const fHeight = this.height;
+
+        const sheet = document.createElement('canvas');
+        sheet.width = fWidth * frames.length;
+        sheet.height = fHeight;
+        const sCtx = sheet.getContext('2d');
+
+        const temp = document.createElement('canvas');
+        temp.width = fWidth;
+        temp.height = fHeight;
+        const tCtx = temp.getContext('2d');
+
+        frames.forEach((frame, i) => {
+            tCtx.clearRect(0, 0, fWidth, fHeight);
+            frame.layers.forEach(l => {
+                if (l.visible) {
+                    // draw image data logic again
+                    const buff = document.createElement('canvas');
+                    buff.width = fWidth;
+                    buff.height = fHeight;
+                    buff.getContext('2d').putImageData(l.data, 0, 0);
+
+                    tCtx.globalAlpha = l.opacity;
+                    tCtx.globalCompositeOperation = l.blendMode;
+                    tCtx.drawImage(buff, 0, 0);
+                }
+            });
+            sCtx.drawImage(temp, i * fWidth, 0);
+        });
+
         const link = document.createElement('a');
-        link.download = 'aether-artifact-' + Date.now() + '.png';
-        link.href = comp.toDataURL();
+        link.download = `sprite-sheet-${Date.now()}.png`;
+        link.href = sheet.toDataURL();
         link.click();
-    }
-
-    centerCanvas() {
-         // CSS handles centering in flex container usually
     }
 
     animate() {
         requestAnimationFrame(this.animate.bind(this));
-        // Can add animated effects here if needed (e.g. "Wet" paint drying)
+
+        // If playing, we don't need to force render canvas as project manager swaps image data?
+        // Actually ProjectManager swaps image data in loop.
+
+        // But we need to render onion skin ON TOP
+        // But LayerManager layers are persistent canvases.
+        // Onion skin should probably be a separate overlay canvas on top of everything?
+        // Or drawn into the 'active' canvas temporarily? No.
+
+        // Let's inject an Onion Skin Canvas into wrapper if not exists
+        let onionCanvas = document.getElementById('onion-canvas');
+        if (!onionCanvas) {
+            onionCanvas = document.createElement('canvas');
+            onionCanvas.id = 'onion-canvas';
+            onionCanvas.width = this.width;
+            onionCanvas.height = this.height;
+            onionCanvas.style.position = 'absolute';
+            onionCanvas.style.top = '0';
+            onionCanvas.style.left = '0';
+            onionCanvas.style.pointerEvents = 'none';
+            onionCanvas.style.zIndex = 50; // Above layers
+            this.wrapper.appendChild(onionCanvas);
+        }
+
+        const oCtx = onionCanvas.getContext('2d');
+        oCtx.clearRect(0, 0, onionCanvas.width, onionCanvas.height);
+
+        this.projectManager.renderOnionSkin(oCtx);
     }
 }
 

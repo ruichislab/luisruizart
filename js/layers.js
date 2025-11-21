@@ -97,7 +97,7 @@ class LayerManager {
         });
     }
 
-    addLayer(name = null) {
+    addLayer(name = null, skipUI = false) {
         const canvas = document.createElement('canvas');
         canvas.width = this.width;
         canvas.height = this.height;
@@ -131,7 +131,7 @@ class LayerManager {
 
         this.layers.push(layer);
         this.setActiveLayer(this.layers.length - 1);
-        this.renderUI();
+        if(!skipUI) this.renderUI();
         return layer;
     }
 
