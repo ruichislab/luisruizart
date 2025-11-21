@@ -3,54 +3,86 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HOLODECK EDITOR | Net Art Tool</title>
+    <title>AETHER LAB | Creation Engine</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
         body {
-            background: #111;
-            color: #00ffff;
+            background: radial-gradient(circle at center, #111, #000);
+            color: #e0ffff;
             font-family: 'Courier New', monospace;
             overflow: hidden;
             display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            flex-direction: row; /* Side-by-side layout */
             height: 100vh;
             margin: 0;
         }
 
         #editor-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: relative;
-            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
-            border: 1px solid rgba(0, 255, 255, 0.3);
+            background: repeating-linear-gradient(
+                45deg,
+                #050505,
+                #050505 10px,
+                #080808 10px,
+                #080808 20px
+            );
+            overflow: auto; /* scroll if canvas is huge */
         }
 
-        canvas {
-            background: #000;
+        #canvas-wrapper {
+            position: relative;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: #000; /* Base background */
+            overflow: hidden;
             cursor: crosshair;
-            display: block;
+        }
+
+        /* Checkboard pattern for transparency */
+        #canvas-wrapper::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image:
+                linear-gradient(45deg, #111 25%, transparent 25%),
+                linear-gradient(-45deg, #111 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #111 75%),
+                linear-gradient(-45deg, transparent 75%, #111 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            z-index: -1;
         }
 
         #toolbar {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(0, 10, 20, 0.9);
-            padding: 15px;
-            border: 1px solid #00ffff;
+            width: 300px;
+            background: rgba(5, 5, 10, 0.95);
+            border-left: 1px solid rgba(0, 255, 255, 0.2);
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            backdrop-filter: blur(10px);
+            gap: 20px;
+            backdrop-filter: blur(20px);
             z-index: 100;
-            max-height: 80vh;
             overflow-y: auto;
+            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            color: #fff;
+            letter-spacing: 3px;
+            margin-bottom: 10px;
+            text-align: center;
+            text-shadow: 0 0 10px rgba(0,255,255,0.5);
         }
 
         .tool-section {
-            border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-            padding-bottom: 10px;
-            margin-bottom: 5px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding-bottom: 15px;
         }
 
         .tool-label {
@@ -58,25 +90,63 @@
             opacity: 0.7;
             margin-bottom: 5px;
             display: block;
+            text-transform: uppercase;
+            letter-spacing: 1px;
         }
 
         button {
-            background: transparent;
-            border: 1px solid rgba(0, 255, 255, 0.5);
+            background: rgba(0, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.3);
             color: #00ffff;
-            padding: 8px;
+            padding: 10px;
             cursor: pointer;
             font-family: inherit;
             text-transform: uppercase;
-            font-size: 12px;
-            transition: all 0.2s;
+            font-size: 11px;
+            letter-spacing: 1px;
+            transition: all 0.3s;
             width: 100%;
-            text-align: left;
+            text-align: center;
+            margin-bottom: 5px;
+            border-radius: 2px;
         }
 
-        button:hover, button.active {
+        button:hover {
             background: rgba(0, 255, 255, 0.2);
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.4);
+            border-color: #00ffff;
+            transform: translateX(2px);
+        }
+
+        button.active {
+            background: #00ffff;
+            color: #000;
+            font-weight: bold;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
+        }
+
+        .row {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .row.center {
+            align-items: center;
+        }
+
+        .row button {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        select, input[type="text"], input[type="number"] {
+            width: 100%;
+            background: #000;
+            color: #00ffff;
+            border: 1px solid rgba(0, 255, 255, 0.5);
+            padding: 5px;
+            font-family: monospace;
+            margin-bottom: 10px;
         }
 
         input[type="range"] {
@@ -89,6 +159,7 @@
             background: transparent;
             border: none;
             height: 30px;
+            cursor: pointer;
         }
 
         #drop-zone {
@@ -100,227 +171,142 @@
             text-align: center;
             opacity: 0.5;
             transition: opacity 0.3s;
+            color: #fff;
         }
 
         .hidden { opacity: 0 !important; }
+
+        /* Layers Panel Styles */
+        #layers-list {
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            background: rgba(0, 0, 0, 0.5);
+            max-height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .layer-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            font-size: 11px;
+        }
+
+        .layer-item:hover {
+            background: rgba(0, 255, 255, 0.1);
+        }
+
+        .layer-item.active {
+            background: rgba(0, 255, 255, 0.2);
+            border-left: 3px solid #00ffff;
+        }
+
+        .layer-vis {
+            margin-right: 8px;
+            cursor: pointer;
+            width: 20px;
+            text-align: center;
+        }
+
+        .layer-name {
+            flex: 1;
+        }
+
+        .layer-del {
+            color: #ff0055;
+            cursor: pointer;
+            padding: 0 5px;
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #000; }
+        ::-webkit-scrollbar-thumb { background: #00ffff; }
     </style>
 </head>
 <body>
 
     <div id="editor-container">
-        <canvas id="canvas"></canvas>
+        <div id="canvas-wrapper">
+            <!-- Canvases injected here by JS -->
+        </div>
         <div id="drop-zone">
-            <h1>DROP IMAGE HERE</h1>
-            <p>or draw from scratch</p>
+            <h1>AETHER CANVAS</h1>
+            <p>Draw to Initialize</p>
         </div>
     </div>
 
     <div id="toolbar">
+        <div class="panel-title">AETHER LAB v2.0</div>
+
         <div class="tool-section">
-            <span class="tool-label">TOOLS</span>
-            <button id="btn-brush" class="active">Brush</button>
-            <button id="btn-eraser">Eraser</button>
-            <button id="btn-generative">Net-Brush</button>
+            <span class="tool-label">Canvas Setup</span>
+            <div class="row center">
+                <input type="number" id="canvas-width" value="800" title="Width">
+                <span style="margin:0 5px">x</span>
+                <input type="number" id="canvas-height" value="600" title="Height">
+            </div>
+            <button id="btn-resize">Apply Resize</button>
         </div>
 
         <div class="tool-section">
-            <span class="tool-label">SETTINGS</span>
-            <input type="color" id="color-picker" value="#00ffff">
+            <span class="tool-label">LAYERS</span>
+            <div id="layers-list">
+                <!-- JS populates this -->
+            </div>
+            <div class="row">
+                <button id="btn-add-layer">+ Add</button>
+                <button id="btn-clear-layer">Clear</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">TOOLS</span>
+            <div class="row">
+                <button id="btn-brush" class="tool-btn active">Brush</button>
+                <button id="btn-eraser" class="tool-btn">Eraser</button>
+            </div>
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">GENERATIVE ENGINES</span>
+            <button id="btn-netweaver" class="tool-btn">Net-Weaver 2.0</button>
+            <button id="btn-cyberflow" class="tool-btn">Cyber-Flow</button>
+            <button id="btn-glitch" class="tool-btn">Glitch-Drag</button>
+            <button id="btn-fractal" class="tool-btn">Fractal-Dust</button>
+        </div>
+
+        <div class="tool-section">
+            <span class="tool-label">PROPERTIES</span>
+            <div class="row">
+                <input type="color" id="color-picker" value="#00ffff">
+                <button id="btn-undo">Undo (Ctrl+Z)</button>
+            </div>
             <span class="tool-label">Size</span>
             <input type="range" id="size-picker" min="1" max="100" value="5">
         </div>
 
         <div class="tool-section">
-            <span class="tool-label">FILTERS</span>
-            <button id="btn-invert">Invert Colors</button>
-            <button id="btn-grayscale">Grayscale</button>
-            <button id="btn-glitch">Cyber Glitch</button>
+            <span class="tool-label">POST-PROCESS FX</span>
+            <div class="row">
+                <button id="btn-invert">Invert</button>
+                <button id="btn-grayscale">B&W</button>
+            </div>
+            <div class="row">
+                <button id="btn-rgb-split">RGB Split</button>
+                <button id="btn-pixelate">Pixelate</button>
+            </div>
         </div>
 
         <div class="tool-section">
-            <span class="tool-label">SYSTEM</span>
-            <button id="btn-clear">Clear Void</button>
-            <button id="btn-save">Download Artifact</button>
+            <span class="tool-label">OUTPUT</span>
+            <button id="btn-save">Export Artifact</button>
         </div>
     </div>
 
     <script type="module" src="js/menu.js"></script>
-    <script>
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const dropZone = document.getElementById('drop-zone');
-
-        // Set Canvas Size
-        canvas.width = Math.min(800, window.innerWidth - 40);
-        canvas.height = Math.min(600, window.innerHeight - 40);
-
-        // Fill black initially
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // State
-        let painting = false;
-        let tool = 'brush'; // brush, eraser, generative
-        let color = '#00ffff';
-        let size = 5;
-
-        // Elements
-        const sizePicker = document.getElementById('size-picker');
-        const colorPicker = document.getElementById('color-picker');
-        const btns = document.querySelectorAll('button');
-
-        // Event Listeners for Tools
-        document.getElementById('btn-brush').onclick = () => setTool('brush', document.getElementById('btn-brush'));
-        document.getElementById('btn-eraser').onclick = () => setTool('eraser', document.getElementById('btn-eraser'));
-        document.getElementById('btn-generative').onclick = () => setTool('generative', document.getElementById('btn-generative'));
-
-        sizePicker.oninput = (e) => size = e.target.value;
-        colorPicker.oninput = (e) => color = e.target.value;
-
-        document.getElementById('btn-clear').onclick = () => {
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            dropZone.classList.remove('hidden');
-        };
-
-        document.getElementById('btn-save').onclick = () => {
-            const link = document.createElement('a');
-            link.download = 'holodeck-artifact.png';
-            link.href = canvas.toDataURL();
-            link.click();
-        };
-
-        // Filters
-        document.getElementById('btn-invert').onclick = () => applyFilter('invert');
-        document.getElementById('btn-grayscale').onclick = () => applyFilter('grayscale');
-        document.getElementById('btn-glitch').onclick = () => applyFilter('glitch');
-
-        function setTool(name, btnElement) {
-            tool = name;
-            btns.forEach(b => b.classList.remove('active'));
-            if(btnElement) btnElement.classList.add('active');
-        }
-
-        // Drawing Logic
-        function startPosition(e) {
-            painting = true;
-            draw(e);
-            dropZone.classList.add('hidden');
-        }
-
-        function endPosition() {
-            painting = false;
-            ctx.beginPath();
-        }
-
-        function draw(e) {
-            if (!painting) return;
-
-            // Get mouse pos relative to canvas
-            const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX || e.touches[0].clientX) - rect.left;
-            const y = (e.clientY || e.touches[0].clientY) - rect.top;
-
-            ctx.lineWidth = size;
-            ctx.lineCap = 'round';
-
-            if (tool === 'eraser') {
-                ctx.strokeStyle = '#000000';
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-            } else if (tool === 'brush') {
-                ctx.strokeStyle = color;
-                ctx.lineTo(x, y);
-                ctx.stroke();
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-            } else if (tool === 'generative') {
-                // Net Art Brush: Draws connecting nodes/lines
-                ctx.fillStyle = color;
-                ctx.fillRect(x + (Math.random()-0.5)*20, y + (Math.random()-0.5)*20, Math.random()*size, Math.random()*size);
-
-                if(Math.random() > 0.5) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = color;
-                    ctx.lineWidth = 1;
-                    ctx.moveTo(x, y);
-                    ctx.lineTo(x + (Math.random()-0.5)*50, y + (Math.random()-0.5)*50);
-                    ctx.stroke();
-                }
-            }
-        }
-
-        // Mouse Events
-        canvas.addEventListener('mousedown', startPosition);
-        canvas.addEventListener('mouseup', endPosition);
-        canvas.addEventListener('mousemove', draw);
-
-        // Touch Events
-        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startPosition(e); });
-        canvas.addEventListener('touchend', (e) => { e.preventDefault(); endPosition(); });
-        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); });
-
-        // Drag & Drop Image
-        document.body.addEventListener('dragover', (e) => e.preventDefault());
-        document.body.addEventListener('drop', (e) => {
-            e.preventDefault();
-            dropZone.classList.add('hidden');
-
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.match('image.*')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        // Draw image fitting canvas
-                        const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-                        const w = img.width * scale;
-                        const h = img.height * scale;
-                        const x = (canvas.width - w) / 2;
-                        const y = (canvas.height - h) / 2;
-
-                        ctx.drawImage(img, x, y, w, h);
-                    };
-                    img.src = ev.target.result;
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-
-        // Filter Implementations
-        function applyFilter(type) {
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-
-            for (let i = 0; i < data.length; i += 4) {
-                if (type === 'invert') {
-                    data[i] = 255 - data[i];     // r
-                    data[i + 1] = 255 - data[i + 1]; // g
-                    data[i + 2] = 255 - data[i + 2]; // b
-                } else if (type === 'grayscale') {
-                    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                    data[i] = avg;
-                    data[i + 1] = avg;
-                    data[i + 2] = avg;
-                }
-            }
-
-            ctx.putImageData(imageData, 0, 0);
-
-            if (type === 'glitch') {
-                // Pixel displacement
-                for(let i=0; i<20; i++) {
-                    const y = Math.random() * canvas.height;
-                    const h = Math.random() * 50;
-                    const offset = (Math.random() - 0.5) * 50;
-
-                    const slice = ctx.getImageData(0, y, canvas.width, h);
-                    ctx.putImageData(slice, offset, y);
-                }
-            }
-        }
-    </script>
+    <script type="module" src="js/editor-app.js"></script>
 </body>
 </html>

@@ -25,7 +25,7 @@ export class NavigationMenu {
             { name: 'DIGITAL RAIN', url: 'rain.html', desc: 'Falling Code' },
             { name: 'NOISE FIELD', url: 'noise.html', desc: 'Fluid Dynamics' },
             { name: 'CYBER GLITCH', url: 'glitch.html', desc: 'Data Corruption' },
-            { name: 'HOLODECK EDITOR', url: 'editor.html', desc: 'Web Photoshop / Tool' }
+            { name: 'AETHER LAB', url: 'editor.html', desc: 'Generative Creation Tool' }
         ];
 
         const ul = document.createElement('ul');
