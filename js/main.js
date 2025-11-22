@@ -138,27 +138,56 @@ class World {
         this.scene.add(this.particles);
 
 
-        // 2. The Artifact (Portal to Legacy)
-        const artifactGeo = new THREE.IcosahedronGeometry(2, 0);
-        const artifactMat = new THREE.MeshBasicMaterial({
-            color: 0xffffff,
+        // 2. Portals System
+        this.portals = [];
+        this.portalGroup = new THREE.Group();
+        this.scene.add(this.portalGroup);
+
+        this.createPortal('archive.html', new THREE.IcosahedronGeometry(1.5, 0), 0xffffff, 0, 0, -15, 'ARCHIVE');
+        this.createPortal('editor.html', new THREE.TorusKnotGeometry(1, 0.3, 100, 16), 0x00ffff, 12, 0, -8, 'EDITOR');
+        this.createPortal('rain.html', new THREE.BoxGeometry(2, 4, 2), 0x00ff00, -12, 0, -8, 'RAIN');
+        this.createPortal('glitch.html', new THREE.OctahedronGeometry(1.5), 0xff00ff, 7, 5, -10, 'GLITCH');
+        this.createPortal('noise.html', new THREE.SphereGeometry(1.5, 16, 16), 0x0000ff, -7, 5, -10, 'NOISE');
+    }
+
+    createPortal(url, geometry, color, x, y, z, label) {
+        const material = new THREE.MeshBasicMaterial({
+            color: color,
             wireframe: true,
             transparent: true,
             opacity: 0.5
         });
-        this.artifact = new THREE.Mesh(artifactGeo, artifactMat);
-        this.artifact.position.set(0, 0, 0);
-        this.scene.add(this.artifact);
 
-        // Artifact Core
-        const coreGeo = new THREE.IcosahedronGeometry(1, 1);
-        const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        this.core = new THREE.Mesh(coreGeo, coreMat);
-        this.artifact.add(this.core);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(x, y, z);
 
-        // Add userData for raycasting identification
-        this.artifact.userData = { isPortal: true, name: "ARCHIVE_PORTAL" };
-        this.core.userData = { isPortal: true, name: "ARCHIVE_PORTAL" };
+        // Inner core
+        const coreGeo = geometry.clone();
+        coreGeo.scale(0.5, 0.5, 0.5);
+        const coreMat = new THREE.MeshBasicMaterial({ color: color });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        mesh.add(core);
+
+        mesh.userData = { isPortal: true, url: url, label: label };
+        core.userData = { isPortal: true, url: url, label: label };
+
+        this.portalGroup.add(mesh);
+        this.portals.push(mesh);
+
+        // Create Label Element
+        const div = document.createElement('div');
+        div.className = 'portal-label';
+        div.textContent = label;
+        div.style.position = 'absolute';
+        div.style.color = '#' + new THREE.Color(color).getHexString();
+        div.style.fontFamily = 'monospace';
+        div.style.fontWeight = 'bold';
+        div.style.textShadow = '0 0 10px currentColor';
+        div.style.pointerEvents = 'none';
+        div.style.opacity = '0';
+        div.style.transition = 'opacity 0.3s';
+        document.body.appendChild(div);
+        mesh.userData.labelElement = div;
     }
 
     setupPostProcessing() {
@@ -215,8 +244,8 @@ class World {
         document.getElementById('ui-layer').style.opacity = '0';
         document.getElementById('start-prompt').style.display = 'none';
 
-        // Camera animation hint (zoom in)
-        // In a real app we might use GSAP, here simple interpolation in animate loop
+        // Fly-in Animation
+        this.camera.position.z = 200;
         this.targetCameraZ = 15;
     }
 
@@ -247,20 +276,23 @@ class World {
         if (intersects.length > 0) {
             const object = intersects[0].object;
             if (object.userData.isPortal) {
-                this.enterPortal();
+                this.enterPortal(object.userData.url);
             }
         }
     }
 
-    enterPortal() {
+    enterPortal(url) {
         // Visual effect for entering
         document.body.style.transition = "filter 1s ease";
         document.body.style.filter = "invert(1)";
 
         this.audioEngine.playEnterSound();
 
+        // Fly into portal effect
+        this.targetCameraZ = -50;
+
         setTimeout(() => {
-            window.location.href = 'archive.html';
+            window.location.href = url;
         }, 1000);
     }
 
@@ -274,9 +306,11 @@ class World {
         this.mouse.lerp(this.targetMouse, 0.05);
 
         // Camera movement based on mouse
-        this.camera.position.x += (this.mouse.x * 10 - this.camera.position.x) * 0.05;
-        this.camera.position.y += (this.mouse.y * 10 - this.camera.position.y) * 0.05;
-        this.camera.lookAt(this.scene.position);
+        this.camera.position.x += (this.mouse.x * 5 - this.camera.position.x) * 0.05;
+        this.camera.position.y += (this.mouse.y * 5 - this.camera.position.y) * 0.05;
+
+        // Always look at center
+        this.camera.lookAt(0, 0, 0);
 
         if (this.started && this.targetCameraZ) {
             this.camera.position.z += (this.targetCameraZ - this.camera.position.z) * 0.02;
@@ -287,36 +321,56 @@ class World {
             this.particles.material.uniforms.time.value = time;
         }
 
-        // Rotate Artifact
-        this.artifact.rotation.x = time * 0.5;
-        this.artifact.rotation.y = time * 0.3;
-        this.core.rotation.x = -time * 1;
-        this.core.rotation.y = -time * 0.5;
+        // Update Portals
+        this.portals.forEach((portal, index) => {
+            portal.rotation.x = time * 0.5 + index;
+            portal.rotation.y = time * 0.3 + index;
 
-        // Pulsate Artifact
-        const scale = 1 + Math.sin(time * 2) * 0.1;
-        this.core.scale.set(scale, scale, scale);
+            // Project label position
+            if (portal.userData.labelElement) {
+                const vector = portal.position.clone();
+                vector.project(this.camera);
+
+                const x = (vector.x * .5 + .5) * window.innerWidth;
+                const y = (-(vector.y * .5) + .5) * window.innerHeight;
+
+                const el = portal.userData.labelElement;
+                el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+            }
+        });
 
         // Raycasting for hover effects
         this.raycaster.setFromCamera(this.mouse, this.camera);
         const intersects = this.raycaster.intersectObjects(this.scene.children, true);
 
         let isHovering = false;
+
+        // Reset all labels opacity
+        this.portals.forEach(p => {
+            if (p.userData.labelElement) p.userData.labelElement.style.opacity = '0.3';
+            p.scale.setScalar(1);
+        });
+
         if (intersects.length > 0) {
-            if (intersects[0].object.userData.isPortal) {
+            const obj = intersects[0].object;
+            // Traverse up to find the main mesh with userData
+            let portal = obj;
+            while(portal.parent && !portal.userData.isPortal) {
+                portal = portal.parent;
+            }
+
+            if (portal.userData.isPortal) {
                 isHovering = true;
+                portal.scale.setScalar(1.2);
+                if(portal.userData.labelElement) {
+                    portal.userData.labelElement.style.opacity = '1';
+                    portal.userData.labelElement.style.fontSize = '1.5rem';
+                }
             }
         }
 
         // Cursor change on hover
         document.body.style.cursor = isHovering ? 'pointer' : 'crosshair';
-        if (isHovering) {
-            this.artifact.material.color.setHex(0x00ff00);
-            this.core.material.color.setHex(0x00ff00);
-        } else {
-            this.artifact.material.color.setHex(0xffffff);
-            this.core.material.color.setHex(0x00ffff);
-        }
 
         this.composer.render();
     }
