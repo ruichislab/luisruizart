@@ -89,8 +89,15 @@ class EditorApp {
         document.getElementById('btn-pan-tool').onclick = () => {
             this.isPanning = !this.isPanning;
             const btn = document.getElementById('btn-pan-tool');
-            btn.classList.toggle('active');
-            this.wrapper.style.cursor = this.isPanning ? 'grab' : 'crosshair';
+            if (this.isPanning) {
+                btn.classList.add('active');
+                this.wrapper.classList.add('panning');
+                this.wrapper.classList.remove('drawing');
+            } else {
+                btn.classList.remove('active');
+                this.wrapper.classList.remove('panning');
+                this.wrapper.classList.add('drawing');
+            }
         };
 
         // Tools
@@ -213,37 +220,38 @@ class EditorApp {
 
         // Draw Events
         this.wrapper.addEventListener('mousedown', (e) => {
-            if (this.isPanning || (e.buttons === 4) || (e.buttons === 1 && e.ctrlKey)) { // Middle click or space+click
-                 this.isPanning = true; // Force pan mode
+            // Check for Pan mode (either persistent or temporary)
+            const isTempPan = (e.buttons === 4) || (e.buttons === 1 && e.ctrlKey);
+
+            if (this.isPanning || isTempPan) {
+                 this.isDraggingPan = true;
                  this.lastPanX = e.clientX;
                  this.lastPanY = e.clientY;
+                 this.wrapper.style.cursor = 'grabbing';
                  return;
             }
             this.startPosition(e);
         });
 
         window.addEventListener('mousemove', (e) => {
-            if (this.isPanning && (e.buttons || e.type === 'touchmove')) { // check buttons or if panning mode locked
-                 // If locked via Hand tool, we always pan if mouse down
-                 if (e.buttons) {
-                     const dx = e.clientX - this.lastPanX;
-                     const dy = e.clientY - this.lastPanY;
-                     this.panX += dx;
-                     this.panY += dy;
-                     this.lastPanX = e.clientX;
-                     this.lastPanY = e.clientY;
-                     this.updateTransform();
-                     return;
-                 }
+            if (this.isDraggingPan) {
+                 const dx = e.clientX - this.lastPanX;
+                 const dy = e.clientY - this.lastPanY;
+                 this.panX += dx;
+                 this.panY += dy;
+                 this.lastPanX = e.clientX;
+                 this.lastPanY = e.clientY;
+                 this.updateTransform();
+                 return;
             }
             this.draw(e);
         });
 
         window.addEventListener('mouseup', () => {
             this.endPosition();
-            // Do not auto-reset panning if it was toggled via button
-            if (!document.getElementById('mobile-hand').classList.contains('active')) {
-                 if(this.isPanning) this.isPanning = false;
+            if (this.isDraggingPan) {
+                this.isDraggingPan = false;
+                this.wrapper.style.cursor = this.isPanning ? 'grab' : 'crosshair';
             }
         });
 

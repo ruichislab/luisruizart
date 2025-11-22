@@ -12,6 +12,18 @@ body {
     cursor: crosshair;
 }
 
+.panning {
+    cursor: grab !important;
+}
+
+.panning:active {
+    cursor: grabbing !important;
+}
+
+.drawing {
+    cursor: crosshair;
+}
+
 /* Loading Overlay */
 #loading {
     position: fixed;

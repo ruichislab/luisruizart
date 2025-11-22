@@ -124,8 +124,8 @@ class LayerManager {
         };
 
         if (isFirst) {
-            layer.ctx.fillStyle = '#000000';
-            layer.ctx.fillRect(0, 0, this.width, this.height);
+            // Default to transparent, user can fill if they want
+            // But let's keep name 'Background'
             layer.name = 'Background';
         }
 
