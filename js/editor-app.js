@@ -22,6 +22,23 @@ class EditorApp {
         this.height = 600;
         this.layerManager.setSize(this.width, this.height);
 
+        // Ensure at least one layer exists
+        if (this.layerManager.layers.length === 0) {
+            this.layerManager.addLayer('Background');
+        }
+
+        // Update Project Manager with initial layer state
+        this.projectManager.frames[0] = {
+            layers: this.layerManager.layers.map(l => ({
+                name: l.name,
+                visible: l.visible,
+                opacity: l.opacity,
+                blendMode: l.blendMode,
+                data: l.ctx.getImageData(0, 0, l.canvas.width, l.canvas.height)
+            }))
+        };
+        this.projectManager.currentFrameIndex = 0;
+
         // Zoom/Pan State
         this.zoom = 1;
         this.panX = 0;
@@ -58,6 +75,22 @@ class EditorApp {
             this.height = h;
             this.layerManager.setSize(w, h);
             this.updateTransform();
+        };
+
+        // Zoom Pan Controls
+        document.getElementById('btn-zoom-in').onclick = () => {
+            this.zoom *= 1.1;
+            this.updateTransform();
+        };
+        document.getElementById('btn-zoom-out').onclick = () => {
+            this.zoom *= 0.9;
+            this.updateTransform();
+        };
+        document.getElementById('btn-pan-tool').onclick = () => {
+            this.isPanning = !this.isPanning;
+            const btn = document.getElementById('btn-pan-tool');
+            btn.classList.toggle('active');
+            this.wrapper.style.cursor = this.isPanning ? 'grab' : 'crosshair';
         };
 
         // Tools
