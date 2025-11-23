@@ -8,11 +8,15 @@ class MobileEditorApp {
         // Fit to screen with High DPI
         this.pixelRatio = window.devicePixelRatio || 1;
         this.width = window.innerWidth;
-        this.height = window.innerHeight;
+        // Subtract top/bottom bars
+        const topBarH = 50;
+        const bottomBarH = 70;
+        this.height = window.innerHeight - topBarH - bottomBarH;
+
         this.layerManager.setSize(this.width, this.height, this.pixelRatio);
 
         // Ensure initial layer
-        this.layerManager.addLayer('Background');
+        this.layerManager.addLayer('Background', true); // skip UI render since we use custom
 
         // State
         this.tool = 'brush';
@@ -20,51 +24,103 @@ class MobileEditorApp {
         this.size = 5;
         this.points = []; // For smoothing
 
-        this.bindUI();
+        this.initUI();
         this.bindEvents();
+        this.renderLayers();
     }
 
-    bindUI() {
-        // Tabs
-        const closeAll = () => document.querySelectorAll('.panel-drawer').forEach(p => p.classList.remove('open'));
+    initUI() {
+        // Navigation
+        const drawers = document.querySelectorAll('.drawer');
+        const overlay = document.getElementById('overlay');
 
-        document.getElementById('tab-tools').onclick = () => {
-            const panel = document.getElementById('tools-panel');
-            const isOpen = panel.classList.contains('open');
-            closeAll();
-            if(!isOpen) panel.classList.add('open');
+        const openDrawer = (id) => {
+            drawers.forEach(d => d.classList.remove('open'));
+            const el = document.getElementById(id);
+            if (el) el.classList.add('open');
+            overlay.classList.add('visible');
         };
 
-        document.getElementById('tab-layers').onclick = () => {
-            const panel = document.getElementById('layers-panel');
-            const isOpen = panel.classList.contains('open');
-            closeAll();
-            if(!isOpen) panel.classList.add('open');
+        const closeAll = () => {
+            drawers.forEach(d => d.classList.remove('open'));
+            overlay.classList.remove('visible');
         };
 
-        document.getElementById('action-undo').onclick = () => this.layerManager.undo();
+        overlay.onclick = closeAll;
+
+        document.getElementById('nav-brushes').onclick = () => openDrawer('drawer-brushes');
+        document.getElementById('nav-layers').onclick = () => {
+            this.renderLayers();
+            openDrawer('drawer-layers');
+        };
+        document.getElementById('nav-color').onclick = () => openDrawer('drawer-color');
+        document.getElementById('nav-draw').onclick = closeAll;
 
         // Tools
-        const setTool = (t) => {
-            this.tool = t;
-            document.querySelectorAll('.m-btn').forEach(b => b.classList.remove('active')); // basic logic
+        document.querySelectorAll('.brush-card').forEach(card => {
+            if(card.id === 'btn-new-layer') return;
+            card.onclick = () => {
+                this.tool = card.dataset.tool;
+                document.querySelectorAll('.brush-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+                closeAll();
+            };
+        });
+
+        // Properties
+        document.getElementById('slider-size').oninput = (e) => this.size = parseInt(e.target.value);
+        document.getElementById('input-color').oninput = (e) => this.color = e.target.value;
+
+        // Layers
+        document.getElementById('btn-new-layer').onclick = () => {
+            this.layerManager.addLayer(null, true);
+            this.renderLayers();
         };
 
-        document.getElementById('btn-brush').onclick = () => setTool('brush');
-        document.getElementById('btn-eraser').onclick = () => setTool('eraser');
-        document.getElementById('btn-netweaver').onclick = () => setTool('netweaver');
-        document.getElementById('btn-cyberflow').onclick = () => setTool('cyberflow');
+        document.getElementById('btn-undo').onclick = () => this.layerManager.undo();
+        document.getElementById('btn-home').onclick = () => window.location.href = 'index.html';
+    }
 
-        document.getElementById('color-picker').onchange = (e) => this.color = e.target.value;
-        document.getElementById('size-picker').oninput = (e) => this.size = parseInt(e.target.value);
+    renderLayers() {
+        const list = document.getElementById('layers-list-mobile');
+        list.innerHTML = '';
 
-        document.getElementById('btn-add-layer').onclick = () => this.layerManager.addLayer();
+        // Render reverse
+        for(let i = this.layerManager.layers.length -1; i >= 0; i--) {
+            const layer = this.layerManager.layers[i];
+            const isActive = i === this.layerManager.activeLayerIndex;
+
+            const el = document.createElement('div');
+            el.className = `layer-row ${isActive ? 'active' : ''}`;
+            el.onclick = () => {
+                this.layerManager.setActiveLayer(i);
+                this.renderLayers();
+            };
+
+            const vis = document.createElement('div');
+            vis.className = `layer-vis ${layer.visible ? 'visible' : ''}`;
+            vis.innerHTML = '👁';
+            vis.onclick = (e) => {
+                e.stopPropagation();
+                this.layerManager.toggleVisibility(i);
+                this.renderLayers();
+            };
+
+            const name = document.createElement('div');
+            name.style.flex = '1';
+            name.innerText = layer.name;
+            name.style.fontSize = '14px';
+
+            el.appendChild(vis);
+            el.appendChild(name);
+            list.appendChild(el);
+        }
     }
 
     bindEvents() {
-        // Use Pointer Events for better support (Stylus pressure etc)
+        // Use Pointer Events for better support
         this.wrapper.addEventListener('pointerdown', (e) => {
-            if(e.button !== 0) return; // Only left click/touch
+            if(e.button !== 0) return;
             e.preventDefault();
 
             const rect = this.wrapper.getBoundingClientRect();
@@ -74,16 +130,17 @@ class MobileEditorApp {
             this.points = [{x, y, pressure: e.pressure}];
             this.layerManager.saveState();
 
-            // Start stroke
             const layer = this.layerManager.getActiveLayer();
             if (layer) {
                 layer.ctx.beginPath();
                 layer.ctx.moveTo(x, y);
-                // Draw a dot
-                layer.ctx.fillStyle = this.color;
-                layer.ctx.arc(x, y, (this.size * e.pressure * this.pixelRatio) / 2, 0, Math.PI*2);
-                layer.ctx.fill();
-                layer.ctx.beginPath(); // Reset for path
+                // Dot
+                if (this.tool !== 'glitch') {
+                    layer.ctx.fillStyle = this.color;
+                    layer.ctx.arc(x, y, (this.size * e.pressure * this.pixelRatio) / 2, 0, Math.PI*2);
+                    layer.ctx.fill();
+                    layer.ctx.beginPath();
+                }
             }
 
             this.wrapper.setPointerCapture(e.pointerId);
@@ -98,7 +155,7 @@ class MobileEditorApp {
             const y = (e.clientY - rect.top) * this.pixelRatio;
 
             this.points.push({x, y, pressure: e.pressure});
-            this.drawSmooth();
+            this.draw();
         });
 
         this.wrapper.addEventListener('pointerup', (e) => {
@@ -107,41 +164,48 @@ class MobileEditorApp {
         });
     }
 
-    drawSmooth() {
+    draw() {
         const layer = this.layerManager.getActiveLayer();
         if (!layer || !layer.visible) return;
         const ctx = layer.ctx;
 
-        if (this.points.length < 3) {
-            const b = this.points[this.points.length - 1];
-            // ctx.beginPath();
-            // ctx.arc(b.x, b.y, ctx.lineWidth / 2, 0, Math.PI * 2, !0);
-            // ctx.fill();
-            // ctx.closePath();
+        // For generative tools that need only last point
+        const p = this.points[this.points.length-1];
+
+        if (this.tool === 'netweaver') {
+            this.drawNetWeaver(ctx, p.x, p.y);
             return;
         }
+        if (this.tool === 'cyberflow') {
+            this.drawCyberFlow(ctx, p.x, p.y);
+            return;
+        }
+        if (this.tool === 'glitch') {
+            this.drawGlitchDrag(ctx, p.x, p.y);
+            return;
+        }
+        if (this.tool === 'fractal') {
+            this.drawFractalDust(ctx, p.x, p.y);
+            return;
+        }
+
+        // Smooth Draw for Brush/Eraser
+        if (this.points.length < 3) return;
 
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
 
-        // Quadratic Curve
         const p1 = this.points[this.points.length - 3];
         const p2 = this.points[this.points.length - 2];
         const p3 = this.points[this.points.length - 1];
-
-        const cp1x = p1.x;
-        const cp1y = p1.y;
-        const cp2x = p2.x;
-        const cp2y = p2.y;
 
         const mid1x = (p1.x + p2.x) / 2;
         const mid1y = (p1.y + p2.y) / 2;
         const mid2x = (p2.x + p3.x) / 2;
         const mid2y = (p2.y + p3.y) / 2;
 
-        // Dynamic width based on pressure
         const pressure = p2.pressure || 0.5;
-        ctx.lineWidth = this.size * this.pixelRatio * (0.5 + pressure); // Min 50% size
+        ctx.lineWidth = this.size * this.pixelRatio * (0.5 + pressure);
 
         ctx.beginPath();
         ctx.moveTo(mid1x, mid1y);
@@ -155,11 +219,7 @@ class MobileEditorApp {
             ctx.globalCompositeOperation = 'destination-out';
             ctx.stroke();
             ctx.globalCompositeOperation = 'source-over';
-        } else if (this.tool === 'netweaver') {
-            this.drawNetWeaver(ctx, p2.x, p2.y);
         }
-
-        // Note: Generative tools might need point-by-point logic instead of smooth curves
     }
 
     drawNetWeaver(ctx, x, y) {
@@ -168,10 +228,9 @@ class MobileEditorApp {
 
         if(Math.random() > 0.8) {
             ctx.beginPath();
-            ctx.arc(x, y, Math.random() * this.size * this.pixelRatio, 0, Math.PI*2);
+            ctx.arc(x, y, Math.random() * this.size * this.pixelRatio * 0.5, 0, Math.PI*2);
             ctx.fill();
 
-            // Random connection to previous points
             const recent = this.points.slice(Math.max(0, this.points.length - 20));
             const r = recent[Math.floor(Math.random() * recent.length)];
             if(r) {
@@ -184,8 +243,59 @@ class MobileEditorApp {
             }
         }
     }
+
+    drawCyberFlow(ctx, x, y) {
+        ctx.strokeStyle = this.color;
+        ctx.globalCompositeOperation = 'screen';
+        const particles = 3;
+        for(let i=0; i<particles; i++) {
+            const offset = (Math.random() - 0.5) * this.size * 2 * this.pixelRatio;
+            const angle = Math.random() * Math.PI * 2;
+            const px = x + Math.cos(angle) * offset;
+            const py = y + Math.sin(angle) * offset;
+            ctx.lineWidth = Math.random() * 2 * this.pixelRatio;
+
+            // Connect from previous point if possible
+            const prev = this.points.length > 1 ? this.points[this.points.length-2] : {x,y};
+
+            ctx.beginPath();
+            ctx.moveTo(prev.x, prev.y);
+            const cp1x = prev.x + (Math.random()-0.5)*50;
+            const cp1y = prev.y + (Math.random()-0.5)*50;
+            ctx.quadraticCurveTo(cp1x, cp1y, px, py);
+            ctx.stroke();
+        }
+    }
+
+    drawGlitchDrag(ctx, x, y) {
+        const s = this.size * 4 * this.pixelRatio;
+        const sx = x + (Math.random()-0.5) * 50 * this.pixelRatio;
+        const sy = y + (Math.random()-0.5) * 50 * this.pixelRatio;
+        try {
+            const data = ctx.getImageData(sx, sy, s, s);
+            // manipulate
+            ctx.putImageData(data, x - s/2, y - s/2);
+        } catch(e) {}
+    }
+
+    drawFractalDust(ctx, x, y) {
+        ctx.fillStyle = this.color;
+        ctx.globalCompositeOperation = 'lighter';
+        const s = this.size * this.pixelRatio;
+        const recursiveDraw = (bx, by, size, depth) => {
+            if (depth <= 0) return;
+            ctx.fillRect(bx, by, size, size);
+            if (Math.random() > 0.5) {
+                const offset = size * 2;
+                recursiveDraw(bx + (Math.random()-0.5)*offset, by + (Math.random()-0.5)*offset, size*0.6, depth-1);
+            }
+        };
+        recursiveDraw(x, y, s, 3);
+    }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => new MobileEditorApp());
+} else {
     new MobileEditorApp();
-});
+}

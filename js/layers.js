@@ -180,6 +180,7 @@ class LayerManager {
     }
 
     renderUI() {
+        if (!this.layersListElement) return; // Safe guard for mobile or missing UI
         this.layersListElement.innerHTML = '';
 
         // Render in reverse order (Top layer first in list)
