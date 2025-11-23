@@ -56,44 +56,34 @@ class LayerManager {
         layer.ctx.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
     }
 
-    setSize(width, height) {
-        this.width = width;
-        this.height = height;
+    setSize(width, height, pixelRatio = 1) {
+        this.width = width * pixelRatio;
+        this.height = height * pixelRatio;
         this.container.style.width = width + 'px';
         this.container.style.height = height + 'px';
+        this.pixelRatio = pixelRatio;
 
-        this.layers.forEach(layer => {
-            // Resize logic could be complex (resample), but for now we preserve content or clear?
-            // "Net Art" glitch aesthetic permits clearing or resizing canvas (which clears it)
-            // Better approach: Create new canvas, draw old one, replace.
-            const newCanvas = document.createElement('canvas');
-            newCanvas.width = width;
-            newCanvas.height = height;
-            const ctx = newCanvas.getContext('2d');
-            ctx.drawImage(layer.canvas, 0, 0, width, height); // stretch or crop?
-            // Let's do crop/center or simple stretch. Simple stretch for now?
-            // Actually, standard is crop.
-            // Let's just set dimensions, which clears, so we need to copy.
-
-            layer.canvas.width = width;
-            layer.canvas.height = height;
-            layer.ctx.drawImage(newCanvas, 0, 0); // Wait, we just cleared it by setting width.
-        });
-
-        // Correct resize:
-        // 1. Save data
-        // 2. Resize
-        // 3. Restore data
         this.layers.forEach(layer => {
             const temp = document.createElement('canvas');
             temp.width = layer.canvas.width;
             temp.height = layer.canvas.height;
             temp.getContext('2d').drawImage(layer.canvas, 0, 0);
 
-            layer.canvas.width = width;
-            layer.canvas.height = height;
-            layer.ctx = layer.canvas.getContext('2d'); // Context persists but state might reset
-            layer.ctx.drawImage(temp, 0, 0);
+            layer.canvas.width = this.width;
+            layer.canvas.height = this.height;
+
+            // Scale context if ratio > 1?
+            // Usually we scale drawing commands, but if we set width/height directly,
+            // 1 css pixel = pixelRatio canvas pixels.
+            // We might want to scale context so 1 unit = 1 css pixel.
+            // But drawing logic usually handles coord transformation.
+            // Let's just resize buffer.
+
+            layer.ctx = layer.canvas.getContext('2d');
+            // layer.ctx.scale(pixelRatio, pixelRatio); // If we want logical coords
+
+            // Draw back stretched
+            layer.ctx.drawImage(temp, 0, 0, this.width, this.height);
         });
     }
 
