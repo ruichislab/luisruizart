@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AETHER LAB | Mobile Studio</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        /* Mobile Specific Overrides */
+        body {
+            flex-direction: column;
+            background: #000;
+        }
+
+        #editor-container {
+            width: 100%;
+            height: 100vh;
+            background: #111;
+        }
+
+        #canvas-wrapper {
+            background: #000;
+            /* Center canvas */
+            margin: auto;
+        }
+
+        /* Simplified Toolbar at Bottom */
+        #mobile-toolbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 80px;
+            background: rgba(10, 10, 15, 0.9);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            padding: 10px;
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #333;
+            z-index: 1000;
+        }
+
+        .m-tool-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: #222;
+            border: 1px solid #444;
+            color: #00ffff;
+            font-size: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .m-tool-btn.active {
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.5);
+        }
+
+        /* Floating Panels */
+        .panel-drawer {
+            position: fixed;
+            bottom: 90px; /* Above toolbar */
+            left: 10px;
+            right: 10px;
+            background: rgba(20, 20, 25, 0.95);
+            border: 1px solid #444;
+            border-radius: 10px;
+            padding: 15px;
+            display: none;
+            z-index: 900;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        .panel-drawer.open {
+            display: block;
+        }
+
+        /* Hide Desktop Elements */
+        #toolbar, #timeline-panel, #mobile-toggle, #mobile-hand {
+            display: none !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="editor-container">
+        <div id="canvas-wrapper">
+            <!-- Canvas injected here -->
+        </div>
+    </div>
+
+    <!-- Panels -->
+    <div id="tools-panel" class="panel-drawer">
+        <h3>Tools</h3>
+        <div class="row">
+            <button id="btn-brush" class="m-btn active">Brush</button>
+            <button id="btn-eraser" class="m-btn">Eraser</button>
+        </div>
+        <div class="row">
+            <button id="btn-netweaver" class="m-btn">Net-Weaver</button>
+            <button id="btn-cyberflow" class="m-btn">Cyber-Flow</button>
+        </div>
+        <h3>Properties</h3>
+        <input type="color" id="color-picker" value="#00ffff" style="width:100%; height:40px; margin-bottom:10px">
+        <input type="range" id="size-picker" min="1" max="50" value="5" style="width:100%">
+    </div>
+
+    <div id="layers-panel" class="panel-drawer">
+        <h3>Layers</h3>
+        <div id="layers-list"></div>
+        <button id="btn-add-layer" style="width:100%; margin-top:10px">+ New Layer</button>
+    </div>
+
+    <div id="mobile-toolbar">
+        <div class="m-tool-btn" id="tab-tools">✎</div>
+        <div class="m-tool-btn" id="tab-layers">L</div>
+        <div class="m-tool-btn" id="action-undo">↶</div>
+        <div class="m-tool-btn" id="action-save">💾</div>
+    </div>
+
+    <script src="js/device-detect.js"></script>
+    <script type="module" src="js/editor-mobile.js"></script>
+</body>
+</html>
