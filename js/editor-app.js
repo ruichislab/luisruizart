@@ -67,7 +67,7 @@ class EditorApp {
     }
 
     bindUI() {
-        // --- Existing UI ---
+        // --- Canvas & View ---
         document.getElementById('btn-resize').onclick = () => {
             const w = parseInt(document.getElementById('canvas-width').value);
             const h = parseInt(document.getElementById('canvas-height').value);
@@ -77,7 +77,6 @@ class EditorApp {
             this.updateTransform();
         };
 
-        // Zoom Pan Controls
         document.getElementById('btn-zoom-in').onclick = () => {
             this.zoom *= 1.1;
             this.updateTransform();
@@ -86,6 +85,20 @@ class EditorApp {
             this.zoom *= 0.9;
             this.updateTransform();
         };
+
+        // --- Toolbar ---
+        const tools = ['brush', 'eraser', 'wand', 'netweaver', 'cyberflow', 'glitch', 'fractal'];
+        tools.forEach(t => {
+            const btn = document.getElementById(`btn-${t}`);
+            if(btn) btn.onclick = () => this.setTool(t, btn);
+        });
+
+        // Menu Bar Interaction
+        document.querySelectorAll('.menu-item').forEach(item => {
+            item.onclick = () => alert("Menu feature '" + item.innerText + "' coming soon!");
+        });
+
+        // Pan Tool Special
         document.getElementById('btn-pan-tool').onclick = () => {
             this.isPanning = !this.isPanning;
             const btn = document.getElementById('btn-pan-tool');
@@ -97,98 +110,65 @@ class EditorApp {
                 btn.classList.remove('active');
                 this.wrapper.classList.remove('panning');
                 this.wrapper.classList.add('drawing');
+                // Revert to last tool cursor? Handled by draw logic.
             }
         };
 
-        // Tools
-        const tools = ['brush', 'eraser', 'netweaver', 'cyberflow', 'glitch', 'fractal'];
-        tools.forEach(t => {
-            const btn = document.getElementById(`btn-${t}`);
-            if(btn) btn.onclick = () => this.setTool(t, btn);
-        });
+        // --- Properties ---
+        const sizePicker = document.getElementById('size-picker');
+        const sizeVal = document.getElementById('size-val');
 
-        document.getElementById('size-picker').oninput = (e) => this.size = parseInt(e.target.value);
+        sizePicker.oninput = (e) => {
+            this.size = parseInt(e.target.value);
+            sizeVal.value = this.size;
+        };
+        sizeVal.oninput = (e) => {
+            this.size = parseInt(e.target.value);
+            sizePicker.value = this.size;
+        };
+
         document.getElementById('color-picker').oninput = (e) => this.color = e.target.value;
 
+        // --- Layers ---
         document.getElementById('btn-add-layer').onclick = () => {
              this.layerManager.addLayer();
-             this.projectManager.handleLayerAdd(); // Sync frames
+             this.projectManager.handleLayerAdd();
         };
         document.getElementById('btn-clear-layer').onclick = () => this.layerManager.clearActiveLayer();
+
+        // --- History ---
         document.getElementById('btn-undo').onclick = () => this.layerManager.undo();
 
-        // Filters
+        // --- Filters ---
         const filters = ['invert', 'grayscale', 'rgb-split', 'pixelate'];
         filters.forEach(f => {
             document.getElementById(`btn-${f}`).onclick = () => this.applyFilter(f);
         });
+        document.getElementById('btn-rem-bg').onclick = () => this.magicWand.removeBackground();
 
-        // Export
+        // --- Export ---
         document.getElementById('btn-save').onclick = () => this.exportSpritesheet();
 
-        // --- Timeline UI ---
+        // --- Timeline ---
         document.getElementById('btn-play').onclick = () => {
             this.projectManager.play();
-            document.getElementById('btn-play').classList.toggle('active');
-            document.getElementById('btn-play').innerText = this.projectManager.isPlaying ? '❚❚' : '▶';
+            const btn = document.getElementById('btn-play');
+            btn.classList.toggle('active');
+            btn.innerText = this.projectManager.isPlaying ? '⏸' : '▶';
         };
         document.getElementById('btn-add-frame').onclick = () => this.projectManager.addFrame(false);
-        document.getElementById('btn-dup-frame').onclick = () => this.projectManager.addFrame(true);
-        document.getElementById('btn-del-frame').onclick = () => this.projectManager.deleteFrame();
+
+        // Optional buttons (might be hidden in new layout)
+        const dupBtn = document.getElementById('btn-dup-frame');
+        if(dupBtn) dupBtn.onclick = () => this.projectManager.addFrame(true);
+        const delBtn = document.getElementById('btn-del-frame');
+        if(delBtn) delBtn.onclick = () => this.projectManager.deleteFrame();
 
         const onionToggle = document.getElementById('onion-skin-toggle');
-        if (onionToggle) {
-            onionToggle.onchange = (e) => {
-                this.projectManager.onionSkin = e.target.checked;
-            };
-        } else {
-            console.error("onion-skin-toggle not found");
-        }
+        if (onionToggle) onionToggle.onchange = (e) => this.projectManager.onionSkin = e.target.checked;
 
         const fpsInput = document.getElementById('fps-input');
-        if (fpsInput) {
-            fpsInput.onchange = (e) => {
-                this.projectManager.fps = parseInt(e.target.value);
-            };
-        } else {
-            console.error("fps-input not found");
-        }
-
-        // --- Magic Wand UI ---
-        const toolSection = document.querySelector('.tool-section:nth-child(3) .row');
-        if (toolSection && !document.getElementById('btn-wand')) {
-            const btn = document.createElement('button');
-            btn.id = 'btn-wand';
-            btn.innerText = 'Wand';
-            btn.onclick = () => this.setTool('wand', btn);
-            toolSection.appendChild(btn);
-        }
-
-        const postSection = document.querySelector('.tool-section:nth-child(5)');
-        if(postSection && !document.getElementById('btn-rem-bg')) {
-             const btn = document.createElement('button');
-             btn.id = 'btn-rem-bg';
-             btn.innerText = 'Remove BG (Auto)';
-             btn.onclick = () => this.magicWand.removeBackground();
-             postSection.appendChild(btn);
-        }
-
-        // Mobile Controls
-        const mobToggle = document.getElementById('mobile-toggle');
-        if(mobToggle) {
-            mobToggle.onclick = () => {
-                document.getElementById('toolbar').classList.toggle('open');
-            };
-        }
-
-        const mobHand = document.getElementById('mobile-hand');
-        if(mobHand) {
-            mobHand.onclick = () => {
-                this.isPanning = !this.isPanning;
-                mobHand.classList.toggle('active');
-                this.wrapper.style.cursor = this.isPanning ? 'grab' : 'crosshair';
-            };
-        }
+        if (fpsInput) fpsInput.onchange = (e) => this.projectManager.fps = parseInt(e.target.value);
     }
 
     bindEvents() {

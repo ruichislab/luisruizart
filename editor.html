@@ -2,526 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AETHER LAB | Creation Engine</title>
-    <link rel="stylesheet" href="css/style.css">
-    <style>
-        body {
-            background: radial-gradient(circle at center, #111, #000);
-            color: #e0ffff;
-            font-family: 'Courier New', monospace;
-            overflow: hidden;
-            display: flex;
-            flex-direction: row; /* Side-by-side layout */
-            height: 100vh;
-            margin: 0;
-        }
-
-        #editor-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            background: repeating-linear-gradient(
-                45deg,
-                #050505,
-                #050505 10px,
-                #080808 10px,
-                #080808 20px
-            );
-            overflow: hidden; /* Handle pan/zoom internally */
-        }
-
-        #canvas-wrapper {
-            position: relative;
-            box-shadow: 0 0 50px rgba(0, 255, 255, 0.1);
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            background: #000; /* Base background */
-            cursor: crosshair;
-            touch-action: none; /* Important for gestures */
-            transform-origin: top left;
-        }
-
-        /* Checkboard pattern for transparency */
-        #canvas-wrapper::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-image:
-                linear-gradient(45deg, #111 25%, transparent 25%),
-                linear-gradient(-45deg, #111 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #111 75%),
-                linear-gradient(-45deg, transparent 75%, #111 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-            z-index: -1;
-        }
-
-        #toolbar {
-            width: 300px;
-            background: rgba(5, 5, 10, 0.95);
-            border-left: 1px solid rgba(0, 255, 255, 0.2);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            backdrop-filter: blur(20px);
-            z-index: 100;
-            overflow-y: auto;
-            box-shadow: -5px 0 20px rgba(0,0,0,0.5);
-            transition: transform 0.3s ease;
-        }
-
-        .panel-title {
-            font-size: 1.2rem;
-            color: #fff;
-            letter-spacing: 3px;
-            margin-bottom: 10px;
-            text-align: center;
-            text-shadow: 0 0 10px rgba(0,255,255,0.5);
-        }
-
-        .tool-section {
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            padding-bottom: 15px;
-        }
-
-        .tool-label {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-            display: block;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        button {
-            background: rgba(0, 255, 255, 0.05);
-            border: 1px solid rgba(0, 255, 255, 0.3);
-            color: #00ffff;
-            padding: 10px;
-            cursor: pointer;
-            font-family: inherit;
-            text-transform: uppercase;
-            font-size: 11px;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            width: 100%;
-            text-align: center;
-            margin-bottom: 5px;
-            border-radius: 2px;
-        }
-
-        button:hover {
-            background: rgba(0, 255, 255, 0.2);
-            border-color: #00ffff;
-            transform: translateX(2px);
-        }
-
-        button.active {
-            background: #00ffff;
-            color: #000;
-            font-weight: bold;
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.6);
-        }
-
-        .row {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 5px;
-        }
-
-        .row.center {
-            align-items: center;
-        }
-
-        .row button {
-            flex: 1;
-            margin-bottom: 0;
-        }
-
-        select, input[type="text"], input[type="number"] {
-            width: 100%;
-            background: #000;
-            color: #00ffff;
-            border: 1px solid rgba(0, 255, 255, 0.5);
-            padding: 5px;
-            font-family: monospace;
-            margin-bottom: 10px;
-        }
-
-        input[type="range"] {
-            width: 100%;
-            accent-color: #00ffff;
-        }
-
-        input[type="color"] {
-            width: 100%;
-            background: transparent;
-            border: none;
-            height: 30px;
-            cursor: pointer;
-        }
-
-        #drop-zone {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-            text-align: center;
-            opacity: 0.5;
-            transition: opacity 0.3s;
-            color: #fff;
-        }
-
-        .hidden { opacity: 0 !important; }
-
-        /* Layers Panel Styles */
-        #layers-list {
-            border: 1px solid rgba(0, 255, 255, 0.2);
-            background: rgba(0, 0, 0, 0.5);
-            max-height: 150px;
-            overflow-y: auto;
-            margin-bottom: 10px;
-        }
-
-        .layer-item {
-            padding: 8px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            font-size: 11px;
-        }
-
-        .layer-item:hover {
-            background: rgba(0, 255, 255, 0.1);
-        }
-
-        .layer-item.active {
-            background: rgba(0, 255, 255, 0.2);
-            border-left: 3px solid #00ffff;
-        }
-
-        .layer-vis {
-            margin-right: 8px;
-            cursor: pointer;
-            width: 20px;
-            text-align: center;
-        }
-
-        .layer-name {
-            flex: 1;
-        }
-
-        .layer-del {
-            color: #ff0055;
-            cursor: pointer;
-            padding: 0 5px;
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: #000; }
-        ::-webkit-scrollbar-thumb { background: #00ffff; }
-
-        /* Timeline Styles */
-        #timeline-panel {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 300px; /* Width of toolbar */
-            height: 120px;
-            background: rgba(5, 5, 10, 0.95);
-            border-top: 1px solid rgba(0, 255, 255, 0.2);
-            display: flex;
-            flex-direction: column;
-            backdrop-filter: blur(20px);
-            z-index: 200;
-            transition: transform 0.3s ease;
-        }
-
-        #timeline-controls {
-            height: 40px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            gap: 15px;
-        }
-
-        #frames-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            overflow-x: auto;
-            padding: 10px 20px;
-            gap: 10px;
-        }
-
-        .frame-thumb {
-            width: 60px;
-            height: 60px;
-            background: #000;
-            border: 1px solid #333;
-            position: relative;
-            flex-shrink: 0;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 10px;
-            color: #666;
-        }
-
-        .frame-thumb.active {
-            border: 2px solid #00ffff;
-            box-shadow: 0 0 10px rgba(0, 255, 255, 0.3);
-        }
-
-        .frame-number {
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            color: #fff;
-            background: rgba(0,0,0,0.7);
-            padding: 1px 3px;
-            font-size: 9px;
-        }
-
-        .t-btn {
-            background: transparent;
-            border: 1px solid #00ffff;
-            color: #00ffff;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-size: 14px;
-            width: auto;
-        }
-
-        .t-btn:hover {
-            background: rgba(0,255,255,0.2);
-        }
-
-        .t-btn.play {
-            background: rgba(0,255,255,0.1);
-            width: 40px;
-        }
-
-        .t-btn.play.active {
-            background: #00ffff;
-            color: #000;
-        }
-
-        /* Mobile Responsive */
-        #mobile-toggle {
-            display: none;
-            position: fixed;
-            bottom: 130px; /* Above timeline */
-            right: 20px;
-            z-index: 500; /* Highest priority */
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid #00ffff;
-            color: #00ffff;
-            padding: 0;
-            font-size: 24px;
-            border-radius: 50%;
-            width: 50px;
-            height: 50px;
-            backdrop-filter: blur(5px);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-        }
-
-        #mobile-hand {
-            display: none;
-            position: fixed;
-            bottom: 130px; /* Above timeline */
-            left: 20px;
-            z-index: 300;
-            background: rgba(0, 0, 0, 0.8);
-            border: 1px solid #00ffff;
-            color: #00ffff;
-            padding: 0;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            font-size: 24px;
-            backdrop-filter: blur(5px);
-            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
-        }
-
-        #mobile-hand.active {
-            background: #00ffff;
-            color: #000;
-        }
-
-        @media (max-width: 768px) {
-            body {
-                flex-direction: column;
-            }
-
-            #toolbar {
-                position: fixed;
-                top: 0;
-                right: 0;
-                height: 100vh;
-                transform: translateX(100%);
-                width: 85%;
-                max-width: 320px;
-                padding-top: 20px;
-                z-index: 400; /* Higher than toggle */
-            }
-
-            #toolbar.open {
-                transform: translateX(0);
-            }
-
-            #timeline-panel {
-                right: 0;
-                bottom: 0;
-                width: 100%;
-                height: 100px;
-            }
-
-            #timeline-controls {
-                overflow-x: auto;
-                gap: 5px;
-                padding: 0 10px;
-            }
-
-            #mobile-toggle {
-                display: block;
-            }
-
-            #mobile-hand {
-                display: block;
-            }
-
-            #editor-container {
-                height: calc(100vh - 100px); /* Minus timeline */
-            }
-
-            .t-btn {
-                padding: 5px 8px;
-                font-size: 12px;
-            }
-        }
-
-    </style>
+    <title>AETHER WORKSTATION</title>
+    <link rel="stylesheet" href="css/editor-pro.css">
+    <script src="js/device-detect.js"></script>
 </head>
 <body>
 
-    <button id="mobile-toggle">☰</button>
-    <button id="mobile-hand">✋</button>
-
-    <div id="editor-container">
-        <div id="canvas-viewport" style="position:relative; overflow:hidden; width:100%; height:100%; display:flex; justify-content:center; align-items:center;">
-             <div id="canvas-wrapper">
-                 <!-- Canvases injected here by JS -->
-             </div>
+    <!-- Header -->
+    <header id="app-header">
+        <div class="app-logo">AETHER LAB</div>
+        <div class="menu-bar">
+            <span class="menu-item">File</span>
+            <span class="menu-item">Edit</span>
+            <span class="menu-item">View</span>
+            <span class="menu-item">Help</span>
         </div>
-        <div id="drop-zone">
-            <h1>AETHER CANVAS</h1>
-            <p>Draw to Initialize</p>
+        <div style="flex:1"></div>
+        <button id="btn-save" class="pro-btn" style="width:auto">Export</button>
+    </header>
+
+    <!-- Left Toolbar -->
+    <aside id="app-toolbar">
+        <button class="tool-btn active" id="btn-brush" title="Brush (B)">🖌</button>
+        <button class="tool-btn" id="btn-eraser" title="Eraser (E)">⌫</button>
+        <button class="tool-btn" id="btn-wand" title="Magic Wand (W)">🪄</button>
+        <button class="tool-btn" id="btn-pan-tool" title="Pan (Space)">✋</button>
+        <div style="height:10px"></div>
+        <button class="tool-btn" id="btn-netweaver" title="Net Weaver">🕸</button>
+        <button class="tool-btn" id="btn-cyberflow" title="Cyber Flow">🌊</button>
+        <button class="tool-btn" id="btn-glitch" title="Glitch">⚡</button>
+        <button class="tool-btn" id="btn-fractal" title="Fractal">❄</button>
+    </aside>
+
+    <!-- Center Viewport -->
+    <main id="app-viewport">
+        <div id="canvas-wrapper">
+            <!-- Canvas injected here -->
         </div>
-    </div>
+    </main>
 
-    <div id="timeline-panel">
-        <div id="timeline-controls">
-            <button class="t-btn play" id="btn-play">▶</button>
-            <button class="t-btn" id="btn-add-frame">+ Frame</button>
-            <button class="t-btn" id="btn-dup-frame">Duplicate</button>
-            <button class="t-btn" id="btn-del-frame">Delete</button>
-
-            <div style="display:flex; align-items:center; margin-left:auto; gap:5px">
-                <span style="font-size:10px; color:#aaa">Onion:</span>
-                <input type="checkbox" id="onion-skin-toggle">
-                <span style="font-size:10px; color:#aaa">FPS:</span>
-                <input type="number" id="fps-input" value="12" min="1" max="60" style="width:40px; margin:0;">
+    <!-- Bottom Timeline -->
+    <section id="app-timeline">
+        <div class="panel-header">
+            <span>Timeline</span>
+            <div class="controls">
+                <button id="btn-play" class="pro-btn" style="width:auto; padding:2px 8px">▶</button>
+                <span style="margin:0 10px">FPS: <input type="number" id="fps-input" value="12"></span>
+                <label><input type="checkbox" id="onion-skin-toggle"> Onion</label>
             </div>
         </div>
-        <div id="frames-container">
-            <!-- Frames populated here -->
+        <div id="timeline-tracks">
+            <div id="frames-container" style="display:flex; height:100%; gap:5px">
+                <!-- Frames -->
+            </div>
+            <button id="btn-add-frame" class="pro-btn" style="width:40px; height:100%; font-size:20px">+</button>
         </div>
-    </div>
+    </section>
 
-    <div id="toolbar">
-        <div class="panel-title">AETHER LAB v2.0</div>
-
-        <div class="tool-section">
-            <span class="tool-label">View & Canvas</span>
-            <div class="row center">
-                <button id="btn-zoom-in" class="t-btn" style="width:auto">+</button>
-                <button id="btn-zoom-out" class="t-btn" style="width:auto">-</button>
-                <button id="btn-pan-tool" class="t-btn" style="width:auto; flex:2">Pan Tool</button>
-            </div>
-            <div class="row center" style="margin-top:5px">
-                <input type="number" id="canvas-width" value="800" title="Width">
-                <span style="margin:0 5px">x</span>
-                <input type="number" id="canvas-height" value="600" title="Height">
-            </div>
-            <button id="btn-resize">Apply Resize</button>
-        </div>
-
-        <div class="tool-section">
-            <span class="tool-label">LAYERS</span>
-            <div id="layers-list">
-                <!-- JS populates this -->
-            </div>
-            <div class="row">
-                <button id="btn-add-layer">+ Add</button>
-                <button id="btn-clear-layer">Clear</button>
-            </div>
-        </div>
-
-        <div class="tool-section">
-            <span class="tool-label">TOOLS</span>
-            <div class="row">
-                <button id="btn-brush" class="tool-btn active">Brush</button>
-                <button id="btn-eraser" class="tool-btn">Eraser</button>
+    <!-- Right Sidebar -->
+    <aside id="app-sidebar">
+        <!-- Layers -->
+        <div class="panel-section" style="flex:1; display:flex; flex-direction:column">
+            <div class="panel-header">Layers</div>
+            <div class="panel-content" style="padding:0; flex:1; display:flex; flex-direction:column">
+                <div id="layers-list" style="flex:1; border:none"></div>
+                <div style="padding:5px; display:flex; gap:5px">
+                    <button id="btn-add-layer" class="pro-btn">+ New</button>
+                    <button id="btn-clear-layer" class="pro-btn">Clear</button>
+                    <button id="btn-dup-frame" class="pro-btn" style="display:none">Dup Frame</button>
+                    <button id="btn-del-frame" class="pro-btn" style="display:none">Del Frame</button>
+                </div>
             </div>
         </div>
 
-        <div class="tool-section">
-            <span class="tool-label">GENERATIVE ENGINES</span>
-            <button id="btn-netweaver" class="tool-btn">Net-Weaver 2.0</button>
-            <button id="btn-cyberflow" class="tool-btn">Cyber-Flow</button>
-            <button id="btn-glitch" class="tool-btn">Glitch-Drag</button>
-            <button id="btn-fractal" class="tool-btn">Fractal-Dust</button>
-        </div>
-
-        <div class="tool-section">
-            <span class="tool-label">PROPERTIES</span>
-            <div class="row">
-                <input type="color" id="color-picker" value="#00ffff">
-                <button id="btn-undo">Undo (Ctrl+Z)</button>
-            </div>
-            <div id="palette-container"></div>
-            <span class="tool-label" style="margin-top:10px">Size</span>
-            <input type="range" id="size-picker" min="1" max="100" value="5">
-        </div>
-
-        <div class="tool-section">
-            <span class="tool-label">POST-PROCESS FX</span>
-            <div class="row">
-                <button id="btn-invert">Invert</button>
-                <button id="btn-grayscale">B&W</button>
-            </div>
-            <div class="row">
-                <button id="btn-rgb-split">RGB Split</button>
-                <button id="btn-pixelate">Pixelate</button>
+        <!-- Properties -->
+        <div class="panel-section">
+            <div class="panel-header">Properties</div>
+            <div class="panel-content">
+                <div class="control-row">
+                    <label>Size</label>
+                    <input type="range" id="size-picker" min="1" max="100" value="5">
+                    <input type="number" id="size-val" value="5">
+                </div>
+                <div class="control-row">
+                    <label>Color</label>
+                    <input type="color" id="color-picker" value="#00ffff">
+                </div>
+                <div id="palette-container"></div>
             </div>
         </div>
 
-        <div class="tool-section">
-            <span class="tool-label">OUTPUT</span>
-            <button id="btn-save">Export Artifact</button>
+        <!-- Canvas/View -->
+        <div class="panel-section">
+            <div class="panel-header">Canvas</div>
+            <div class="panel-content">
+                <div class="control-row">
+                    <input type="number" id="canvas-width" value="800">
+                    <span>x</span>
+                    <input type="number" id="canvas-height" value="600">
+                </div>
+                <button id="btn-resize" class="pro-btn">Resize</button>
+                <div style="margin-top:10px; display:flex; gap:5px">
+                    <button id="btn-zoom-in" class="pro-btn">Zoom In</button>
+                    <button id="btn-zoom-out" class="pro-btn">Zoom Out</button>
+                </div>
+            </div>
         </div>
-    </div>
 
-    <script src="js/device-detect.js"></script>
+        <!-- Filters -->
+        <div class="panel-section">
+            <div class="panel-header">Effects</div>
+            <div class="panel-content" style="display:grid; grid-template-columns:1fr 1fr; gap:5px">
+                <button id="btn-invert" class="pro-btn">Invert</button>
+                <button id="btn-grayscale" class="pro-btn">B&W</button>
+                <button id="btn-rgb-split" class="pro-btn">RGB Split</button>
+                <button id="btn-pixelate" class="pro-btn">Pixelate</button>
+                <button id="btn-rem-bg" class="pro-btn" style="grid-column: span 2">Remove BG</button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="panel-header">History</div>
+            <div class="panel-content">
+                <button id="btn-undo" class="pro-btn">Undo (Ctrl+Z)</button>
+            </div>
+        </div>
+    </aside>
+
     <script type="module" src="js/menu.js"></script>
     <script type="module" src="js/editor-app.js"></script>
 </body>
