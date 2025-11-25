@@ -98,6 +98,12 @@ class EditorApp {
             item.onclick = () => alert("Menu feature '" + item.innerText + "' coming soon!");
         });
 
+        // Main Menu Toggle
+        document.getElementById('pro-menu-btn').onclick = () => {
+            const nav = document.getElementById('main-nav');
+            if(nav) nav.classList.toggle('active');
+        };
+
         // Pan Tool Special
         document.getElementById('btn-pan-tool').onclick = () => {
             this.isPanning = !this.isPanning;

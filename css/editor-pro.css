@@ -19,6 +19,11 @@
     --footer-height: 30px;
 }
 
+/* Hide default floating menu toggle in Pro Editor */
+#menu-toggle {
+    display: none !important;
+}
+
 body {
     margin: 0;
     background-color: var(--bg-app);
