@@ -12,6 +12,18 @@ body {
     cursor: crosshair;
 }
 
+.panning {
+    cursor: grab !important;
+}
+
+.panning:active {
+    cursor: grabbing !important;
+}
+
+.drawing {
+    cursor: crosshair;
+}
+
 /* Loading Overlay */
 #loading {
     position: fixed;
@@ -110,6 +122,12 @@ body {
     transform: translateX(-100%);
     transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
     backdrop-filter: blur(10px);
+    pointer-events: none; /* Prevent blocking when closed */
+}
+
+#main-nav.active {
+    transform: translateX(0);
+    pointer-events: all; /* Enable interaction */
 }
 
 #main-nav.active {

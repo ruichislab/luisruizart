@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>AETHER LAB | Mobile Studio</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        :root {
+            --bg-dark: #0a0a0a;
+            --bg-panel: rgba(20, 20, 20, 0.95);
+            --accent: #00e5ff;
+            --text: #ffffff;
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            overflow: hidden;
+            touch-action: none;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #viewport {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: repeating-linear-gradient(45deg, #050505 0, #050505 10px, #080808 10px, #080808 20px);
+        }
+
+        #canvas-wrapper {
+            background: #000;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Top Bar */
+        #top-bar {
+            height: 50px;
+            background: var(--bg-panel);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            border-bottom: 1px solid var(--border);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .app-title {
+            font-weight: bold;
+            letter-spacing: 2px;
+            font-size: 14px;
+            color: var(--accent);
+        }
+
+        .icon-btn {
+            background: none;
+            border: none;
+            color: var(--text);
+            font-size: 20px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 50%;
+        }
+
+        .icon-btn:active {
+            background: rgba(255,255,255,0.1);
+        }
+
+        /* Bottom Toolbar */
+        #bottom-bar {
+            height: 70px;
+            background: var(--bg-panel);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            border-top: 1px solid var(--border);
+            z-index: 1000;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .tool-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #888;
+            gap: 4px;
+            background: none;
+            border: none;
+        }
+
+        .tool-btn.active {
+            color: var(--accent);
+        }
+
+        .tool-icon {
+            width: 24px;
+            height: 24px;
+            border: 1px solid currentColor;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 14px;
+        }
+
+        .tool-btn.active .tool-icon {
+            background: rgba(0, 229, 255, 0.2);
+            box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+        }
+
+        /* Drawers */
+        .drawer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 60vh;
+            background: var(--bg-panel);
+            border-top-left-radius: 20px;
+            border-top-right-radius: 20px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+            border-top: 1px solid var(--accent);
+        }
+
+        .drawer.open {
+            transform: translateY(0);
+        }
+
+        .drawer-handle {
+            width: 40px;
+            height: 4px;
+            background: #444;
+            border-radius: 2px;
+            margin: 10px auto;
+        }
+
+        .drawer-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        /* Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 12px;
+            text-transform: uppercase;
+            opacity: 0.7;
+        }
+
+        .brush-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .brush-card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+        }
+
+        .brush-card.active {
+            border-color: var(--accent);
+            background: rgba(0, 229, 255, 0.1);
+        }
+
+        /* Layers List */
+        .layer-row {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+        }
+
+        .layer-row.active {
+            border-color: var(--accent);
+        }
+
+        .layer-vis {
+            padding: 10px;
+            color: #888;
+        }
+
+        .layer-vis.visible {
+            color: var(--accent);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1050;
+            display: none;
+        }
+        .overlay.visible { display: block; }
+
+    </style>
+</head>
+<body>
+
+    <div id="top-bar">
+        <button class="icon-btn" id="btn-home">☰</button>
+        <div class="app-title">AETHER MOBILE</div>
+        <button class="icon-btn" id="btn-undo">↶</button>
+    </div>
+
+    <div id="viewport">
+        <div id="canvas-wrapper">
+            <!-- Canvas injected by JS -->
+        </div>
+    </div>
+
+    <div id="bottom-bar">
+        <button class="tool-btn active" id="nav-draw">
+            <div class="tool-icon">✎</div>
+            <span>Draw</span>
+        </button>
+        <button class="tool-btn" id="nav-brushes">
+            <div class="tool-icon">❖</div>
+            <span>Brushes</span>
+        </button>
+        <button class="tool-btn" id="nav-color">
+            <div class="tool-icon">●</div>
+            <span>Color</span>
+        </button>
+        <button class="tool-btn" id="nav-layers">
+            <div class="tool-icon">≣</div>
+            <span>Layers</span>
+        </button>
+    </div>
+
+    <!-- Brushes Drawer -->
+    <div id="drawer-brushes" class="drawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-content">
+            <div class="control-group">
+                <span class="control-label">Select Engine</span>
+                <div class="brush-grid">
+                    <div class="brush-card active" data-tool="brush">Basic</div>
+                    <div class="brush-card" data-tool="netweaver">NetWeaver</div>
+                    <div class="brush-card" data-tool="cyberflow">CyberFlow</div>
+                    <div class="brush-card" data-tool="glitch">Glitch</div>
+                    <div class="brush-card" data-tool="fractal">Fractal</div>
+                    <div class="brush-card" data-tool="eraser">Eraser</div>
+                </div>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Size</span>
+                <input type="range" id="slider-size" min="1" max="50" value="5">
+            </div>
+        </div>
+    </div>
+
+    <!-- Layers Drawer -->
+    <div id="drawer-layers" class="drawer">
+        <div class="drawer-handle"></div>
+        <div class="drawer-content">
+            <div class="control-group">
+                <button class="brush-card" style="width:100%" id="btn-new-layer">+ New Layer</button>
+            </div>
+            <div id="layers-list-mobile"></div>
+        </div>
+    </div>
+
+    <!-- Color Drawer -->
+    <div id="drawer-color" class="drawer" style="height:40vh">
+        <div class="drawer-handle"></div>
+        <div class="drawer-content">
+            <input type="color" id="input-color" value="#00ffff" style="width:100%; height:100px; border:none;">
+        </div>
+    </div>
+
+    <div id="overlay" class="overlay"></div>
+
+    <script src="js/device-detect.js"></script>
+    <script type="module" src="js/editor-mobile.js"></script>
+</body>
+</html>
